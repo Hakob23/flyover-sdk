@@ -1,4 +1,4 @@
-import { BytesLike, Contract, utils } from "ethers"
+import { BigNumber, BytesLike, Contract, utils } from "ethers"
 import abi from './pegout-abi'
 import { callContractFunction, Connection, decodeBtcAddress, executeContractFunction, executeContractView, FlyoverConfig, isRskAddress, TxResult } from "@rsksmart/bridges-core-sdk"
 import { Quotes } from "./bindings/Pegout"
@@ -68,6 +68,18 @@ export class PegOutContract {
   async isPegOutQuoteCompleted (quoteHash: string): Promise<boolean> {
     const hashBytes = utils.arrayify('0x' + quoteHash)
     return executeContractView(this.pegoutContract, 'isQuoteCompleted', hashBytes)
+  }
+
+  /**
+   * Reads the change threshold of the PegOutContract: change at or above it is refunded,
+   * smaller change is kept as part of the call fee.
+   *
+   * @param blockTag block number to read at
+   * @returns the dust threshold in wei
+   */
+  async getDustThreshold (blockTag: number): Promise<bigint> {
+    const threshold = await executeContractView<BigNumber>(this.pegoutContract, 'dustThreshold', { blockTag })
+    return BigInt(threshold.toString())
   }
 
   private toContractPegoutQuote (detail: PegoutQuoteDetail): Quotes.PegOutQuoteStruct {
