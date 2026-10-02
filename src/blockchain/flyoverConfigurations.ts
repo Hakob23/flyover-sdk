@@ -1,8 +1,8 @@
-import { type Connection, executeContractView, isRskAddress } from '@rsksmart/bridges-core-sdk'
+import { type Connection, executeContractView, type FlyoverConfig, isRskAddress } from '@rsksmart/bridges-core-sdk'
 import { type BigNumber, Contract } from 'ethers'
 import abi from './flyover-configurations-abi'
 import { type IFlyoverConfigurations } from './bindings/FlyoverConfigurations'
-import { FlyoverNetworks, type FlyoverSupportedNetworks, type FlyoverCommitFirstConfig } from '../constants/networks'
+import { FlyoverNetworks, type FlyoverSupportedNetworks } from '../constants/networks'
 
 /** A confirmation tier: amounts up to maxAmount (wei) require confirmations BTC confirmations. */
 export interface ConfirmationTier {
@@ -42,7 +42,7 @@ export interface PegOutConfiguration {
 export class FlyoverConfigurationsContract {
   private readonly configurationsContract: Contract
 
-  constructor (rskConnection: Connection, config: FlyoverCommitFirstConfig) {
+  constructor (rskConnection: Connection, config: FlyoverConfig) {
     const address = config.customFlyoverConfigurationsAddress ??
       FlyoverNetworks[config.network as FlyoverSupportedNetworks]?.flyoverConfigurationsAddress
     if (address === undefined || !isRskAddress(address)) {
