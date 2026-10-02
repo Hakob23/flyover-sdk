@@ -41,6 +41,7 @@ interface FlyoverConfig extends BridgesConfig {
   customRegtestUrl?: string
   captchaTokenResolver: CaptchaTokenResolver
   disableChecksum?: boolean
+  customFlyoverConfigurationsAddress?: string
 }
 ```
 - **network**: this is the name of the network your going to connect to. It can be any of the following:
@@ -56,6 +57,7 @@ However we advice to only use `Mainnet` or `Testnet` for integration purposes as
 - **customRegtestUrl**: this parameter is deprecated and will be removed in future versions. You can disregard it.
 - **captchaTokenResolver**: some liquidity providers might want their quotes to be human-generated only for security reasons. For this cases the FlyoverSDK needs a function to get the captcha token returned from a successful captcha challenge from wherever the client application decided to store it. The SDK only expects the token to be returned to that function so the signature is `() => Promise<string>`
 - **disableChecksum**: this parameter tells the FlyoverSDK whether to disable the RSK checksum validation for the RSK addresses involved in the PegIn and PegOut operations or not. It is false by default.
+- **customFlyoverConfigurationsAddress**: address of the `FlyoverConfigurations` contract, which holds the commit-first protocol parameters. It is required until that contract has a canonical deployment on the selected network.
 
 ## Connect to RSK
 If you need to connect to RSK to execute some operation then you need to create a Connection object and provide it to the Flyover object
