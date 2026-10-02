@@ -66,6 +66,7 @@
     },
     "dependencies": {
         "@rsksmart/bridges-core-sdk": "^0.6.0",
+        "@rsksmart/flyover-sdk": "^1.9.1",
         "@rsksmart/pmt-builder": "^3.0.1",
         "bitcoinjs-lib": "^6.1.6",
         "qrcode": "^1.5.1"
