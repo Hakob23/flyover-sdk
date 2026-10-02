@@ -1,7 +1,6 @@
 import { describe, test, jest, expect } from '@jest/globals'
-import { type BlockchainConnection, ethers } from '@rsksmart/bridges-core-sdk'
+import { type BlockchainConnection, ethers, type FlyoverConfig } from '@rsksmart/bridges-core-sdk'
 import { FlyoverConfigurationsContract } from './flyoverConfigurations'
-import { type FlyoverCommitFirstConfig } from '../constants/networks'
 
 jest.mock('ethers')
 
@@ -15,7 +14,7 @@ const connectionMock = jest.mocked({
 
 const CONFIG_ADDRESS = '0x4186a8ecd32cf005a5122b63195f7117cbc4be19'
 
-const config: FlyoverCommitFirstConfig = {
+const config: FlyoverConfig = {
   network: 'Regtest',
   captchaTokenResolver: async () => Promise.resolve(''),
   customFlyoverConfigurationsAddress: CONFIG_ADDRESS
@@ -45,7 +44,7 @@ function mockContract (functions: Record<string, unknown>): void {
 
 describe('FlyoverConfigurationsContract should', () => {
   test('throw when neither a network default nor a custom address is available', () => {
-    const noAddress: FlyoverCommitFirstConfig = { network: 'Mainnet', captchaTokenResolver: async () => Promise.resolve('') }
+    const noAddress: FlyoverConfig = { network: 'Mainnet', captchaTokenResolver: async () => Promise.resolve('') }
     expect(() => new FlyoverConfigurationsContract(connectionMock, noAddress)).toThrow(/invalid FlyoverConfigurations address/)
   })
 
