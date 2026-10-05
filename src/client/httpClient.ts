@@ -97,4 +97,56 @@ export class FlyoverError extends BridgeError {
       details: { reason: args.reason, timestamp: args.timestamp }
     })
   }
+
+  static invalidPegoutAmount (args: { amount: bigint, reason: string }): FlyoverError {
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: false,
+      message: 'Invalid peg-out amount',
+      details: { amount: args.amount.toString(), reason: args.reason }
+    })
+  }
+
+  static pegoutInsufficientValue (args: { value: bigint, minimum: bigint }): FlyoverError {
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: false,
+      message: 'Peg-out value too low',
+      details: {
+        value: args.value.toString(),
+        minimum: args.minimum.toString(),
+        reason: `the value must be at least ${args.minimum.toString()} wei (fixedFee + maxMinerFee + 1)`
+      }
+    })
+  }
+
+  static pegoutNotServiceable (args: { amount: bigint, minAmount: bigint, maxAmount: bigint }): FlyoverError {
+    const violatedBound = args.amount < args.minAmount ? 'minAmount' : 'maxAmount'
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: false,
+      message: 'Peg-out not serviceable',
+      details: {
+        amount: args.amount.toString(),
+        minAmount: args.minAmount.toString(),
+        maxAmount: args.maxAmount.toString(),
+        violatedBound
+      }
+    })
+  }
+
+  static unfairPegoutConfiguration (args: { deadlineSeconds: bigint, maxSeconds: bigint, deadlineBlocks: bigint, maxBlocks: bigint }): FlyoverError {
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: true,
+      message: 'Unfair peg-out configuration',
+      details: {
+        reason: 'the peg-out deadlines exceed the native peg-out cap, so the escrow would reject any request',
+        deadlineSeconds: args.deadlineSeconds.toString(),
+        maxSeconds: args.maxSeconds.toString(),
+        deadlineBlocks: args.deadlineBlocks.toString(),
+        maxBlocks: args.maxBlocks.toString()
+      }
+    })
+  }
 }
