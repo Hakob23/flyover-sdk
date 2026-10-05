@@ -8,9 +8,9 @@ import { deepFreeze } from '@rsksmart/bridges-core-sdk'
  * Regtest url will be overrided if  {@link FlyoverConfig.customRegtestUrl} is provided to the client in {@link FlyoverConfig}
  * Regtest LBC address will be overrided if  {@link FlyoverConfig.customLbcAddress} is provided to the client in {@link FlyoverConfig}
  *
- * The commit-first {@link flyoverConfigurationsAddress} is not deployed on any network yet, so it is
- * optional per network and can be provided through
- * {@link FlyoverConfig.customFlyoverConfigurationsAddress}.
+ * The commit-first contracts ({@link flyoverConfigurationsAddress} and {@link pegOutEscrowAddress}) are
+ * not deployed on any network yet, so they are optional per network and can be provided through
+ * {@link FlyoverConfig.customFlyoverConfigurationsAddress} and {@link FlyoverConfig.customPegOutEscrowAddress}.
  */
 export const FlyoverNetworks = deepFreeze({
   Mainnet: {
@@ -18,6 +18,7 @@ export const FlyoverNetworks = deepFreeze({
     pegOutContractAddress: '0x9a0678742cfb567874eb4e99df2106bded78f5e4',
     discoveryAddress: '0x9a48c6b18aa000d0bd35d55616bcc98ad3553e7a',
     flyoverConfigurationsAddress: undefined as string | undefined,
+    pegOutEscrowAddress: undefined as string | undefined,
     chainId: 30
   },
   Testnet: {
@@ -25,6 +26,7 @@ export const FlyoverNetworks = deepFreeze({
     pegOutContractAddress: '0x48d19e10A166E20746af5037e79A5cEa5BD38Cc8',
     discoveryAddress: '0xE8610c632c4219b0245b39d5Cd216A31F491d919',
     flyoverConfigurationsAddress: undefined as string | undefined,
+    pegOutEscrowAddress: undefined as string | undefined,
     chainId: 31
   },
   Development: {
@@ -32,6 +34,7 @@ export const FlyoverNetworks = deepFreeze({
     pegOutContractAddress: '0x4dd0f80e26ed2416bf02550ff8e42de1d59170cb',
     discoveryAddress: '0x9bd4bd617d2a5df4b59a5ba78f52dd85681a3f4e',
     flyoverConfigurationsAddress: undefined as string | undefined,
+    pegOutEscrowAddress: undefined as string | undefined,
     chainId: 31
   },
   Regtest: {
@@ -39,6 +42,7 @@ export const FlyoverNetworks = deepFreeze({
     pegOutContractAddress: '0x15c240d9Fb91224c0d3Ca9b04Ff63844aA3dF040',
     discoveryAddress: '0xe16b04a1a87aC65a4aF8D46a8b797D0d46572408',
     flyoverConfigurationsAddress: undefined as string | undefined,
+    pegOutEscrowAddress: undefined as string | undefined,
     chainId: 33
   }
 } as const)

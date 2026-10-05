@@ -153,20 +153,7 @@ export async function estimatePegout (context: FlyoverSDKContext, amount: bigint
     throw FlyoverError.withReason(`peg-out estimate derived ${split.amount.toString()} instead of ${amount.toString()}`)
   }
 
-  if (amount < config.minAmount || amount > config.maxAmount) {
-    throw FlyoverError.pegoutNotServiceable({ amount, minAmount: config.minAmount, maxAmount: config.maxAmount })
-  }
-
-  const deadlineSeconds = config.claimWindow + config.expireTime
-  const deadlineBlocks = config.claimWindowBlocks + config.expireBlocks
-  if (deadlineSeconds > NATIVE_PEGOUT_SECONDS || deadlineBlocks > NATIVE_PEGOUT_BLOCKS) {
-    throw FlyoverError.unfairPegoutConfiguration({
-      deadlineSeconds,
-      maxSeconds: NATIVE_PEGOUT_SECONDS,
-      deadlineBlocks,
-      maxBlocks: NATIVE_PEGOUT_BLOCKS
-    })
-  }
+  assertPegoutServiceable(amount, config)
 
   const blockNumber = BigInt(block.number)
   const blockTimestamp = BigInt(block.timestamp)
@@ -178,10 +165,32 @@ export async function estimatePegout (context: FlyoverSDKContext, amount: bigint
     requiredConfirmations,
     depositDateLimit,
     expireDate: depositDateLimit + config.expireTime,
-    expireBlock: blockNumber + deadlineBlocks,
+    expireBlock: blockNumber + config.claimWindowBlocks + config.expireBlocks,
     transferTime: config.callTime,
     blockNumber,
     blockTimestamp
+  }
+}
+
+/**
+ * Rejects what `PegOutEscrow.requestPegOut` would reject for a principal, in the contract's order:
+ * an amount outside `[minAmount, maxAmount]`, then deadlines above the native peg-out cap.
+ *
+ * @throws { FlyoverError } When the escrow would revert with `NotServiceable` or `UnfairQuote`
+ */
+export function assertPegoutServiceable (amount: bigint, config: PegOutConfiguration): void {
+  if (amount < config.minAmount || amount > config.maxAmount) {
+    throw FlyoverError.pegoutNotServiceable({ amount, minAmount: config.minAmount, maxAmount: config.maxAmount })
+  }
+  const deadlineSeconds = config.claimWindow + config.expireTime
+  const deadlineBlocks = config.claimWindowBlocks + config.expireBlocks
+  if (deadlineSeconds > NATIVE_PEGOUT_SECONDS || deadlineBlocks > NATIVE_PEGOUT_BLOCKS) {
+    throw FlyoverError.unfairPegoutConfiguration({
+      deadlineSeconds,
+      maxSeconds: NATIVE_PEGOUT_SECONDS,
+      deadlineBlocks,
+      maxBlocks: NATIVE_PEGOUT_BLOCKS
+    })
   }
 }
 

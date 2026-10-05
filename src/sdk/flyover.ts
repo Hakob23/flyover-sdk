@@ -50,6 +50,8 @@ import { PegOutContract } from '../blockchain/pegout'
 import { DiscoveryContract } from '../blockchain/discovery'
 import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfigurations'
 import { estimatePegout, type PegoutEstimate } from './estimatePegout'
+import { PegOutEscrowContract, type PegoutRequest } from '../blockchain/pegoutEscrow'
+import { requestPegout } from './requestPegout'
 
 /** Class that represents the entrypoint to the Flyover SDK */
 export class Flyover implements Bridge {
@@ -358,6 +360,9 @@ export class Flyover implements Bridge {
    * @throws { Error } If not connected to RSK
    *
    * @returns string the transaction hash
+   *
+   * @deprecated Use {@link Flyover.requestPegOut}. A commit-first peg-out is one escrow deposit with
+   * no LP-signed quote; send the `value` from {@link Flyover.estimatePegOut}.
    */
   async depositPegout (quote: PegoutQuote, signature: string, amount: bigint): Promise<string> {
     this.checkLbc()
@@ -416,6 +421,14 @@ export class Flyover implements Bridge {
     const lbc = this.liquidityBridgeContract!
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     lbc.flyoverConfigurations ??= new FlyoverConfigurationsContract(this.config.rskConnection!, this.config)
+  }
+
+  private ensurePegOutEscrow (): void {
+    this.checkLbc()
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const lbc = this.liquidityBridgeContract!
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    lbc.pegOutEscrow ??= new PegOutEscrowContract(this.config.rskConnection!, this.config)
   }
 
   private ensureRskBridge (): void {
@@ -697,6 +710,36 @@ export class Flyover implements Bridge {
   async estimatePegOut (amount: bigint): Promise<PegoutEstimate> {
     this.ensureFlyoverConfigurations()
     return estimatePegout(this.getFlyoverContext(), amount)
+  }
+
+  /**
+   * Starts a commit-first peg-out with one PegOutEscrow.requestPegOut transaction that escrows
+   * `value`. It replaces the {@link Flyover.acceptPegoutQuote} and {@link Flyover.depositPegout} flow.
+   * Every check the escrow would revert on runs first, against the live peg-out configuration, so a
+   * rejected request sends no transaction.
+   *
+   * Requires a signing connection to RSK ({@link Flyover.connectToRsk}) and the FlyoverConfigurations
+   * and PegOutEscrow addresses for the configured network, or `customFlyoverConfigurationsAddress`
+   * and `customPegOutEscrowAddress` in the config.
+   *
+   * @param { string } destinationAddress The BTC address that receives the peg-out
+   * @param { string } refundAddress The RSK address that can cancel the request and receives every refund
+   * @param { bigint } value The RBTC to send, in wei. Use `value` from {@link Flyover.estimatePegOut}
+   *
+   * @returns { PegoutRequest } The request id, the transaction hash and the escrow nonce
+   *
+   * @throws { FlyoverError } When an address is invalid, the value is too low or the derived amount is
+   * outside the configured bounds, the configuration is unfair, or the mined transaction reverted
+   *
+   * @example
+   *
+   * const estimate = await flyover.estimatePegOut(BigInt('5000000000000000'))
+   * const { requestHash } = await flyover.requestPegOut(btcAddress, refundAddress, estimate.value)
+   */
+  async requestPegOut (destinationAddress: string, refundAddress: string, value: bigint): Promise<PegoutRequest> {
+    this.ensureFlyoverConfigurations()
+    this.ensurePegOutEscrow()
+    return requestPegout(this.getFlyoverContext(), destinationAddress, refundAddress, value)
   }
 
   private getFlyoverContext (): FlyoverSDKContext {

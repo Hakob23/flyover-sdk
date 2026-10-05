@@ -135,6 +135,15 @@ export class FlyoverError extends BridgeError {
     })
   }
 
+  static pegoutRequestReverted (args: { txHash: string, reason: string }): FlyoverError {
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: false,
+      message: 'Peg-out request reverted',
+      details: { txHash: args.txHash, reason: args.reason }
+    })
+  }
+
   static unfairPegoutConfiguration (args: { deadlineSeconds: bigint, maxSeconds: bigint, deadlineBlocks: bigint, maxBlocks: bigint }): FlyoverError {
     return new FlyoverError({
       timestamp: Date.now(),
