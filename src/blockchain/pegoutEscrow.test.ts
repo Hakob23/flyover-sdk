@@ -31,14 +31,22 @@ function receipt (events: unknown[]): unknown {
 
 describe('PegOutEscrowContract should', () => {
   let requestPegOut: jest.Mock<any>
+  let cancelPegOut: jest.Mock<any>
   let getPegOutQuote: jest.Mock<any>
+  let getPegOutState: jest.Mock<any>
   let wait: jest.Mock<any>
+  let signer: { getAddress: jest.Mock<any> } | null
 
   beforeEach(() => {
     wait = jest.fn<any>().mockResolvedValue(receipt([{ event: 'PegOutRequested', args: { requestHash: REQUEST_HASH } }]))
     requestPegOut = jest.fn<any>().mockResolvedValue({ hash: TX_HASH, wait })
-    getPegOutQuote = jest.fn<any>().mockResolvedValue({ nonce: BigNumber.from(7) })
-    jest.mocked(ethers.Contract).mockImplementation(() => ({ address: ESCROW_ADDRESS, requestPegOut, getPegOutQuote }) as any)
+    cancelPegOut = jest.fn<any>().mockResolvedValue({ hash: TX_HASH, wait: jest.fn<any>().mockResolvedValue(receipt([])) })
+    getPegOutQuote = jest.fn<any>().mockResolvedValue({ nonce: BigNumber.from(7), rskRefundAddress: REFUND_ADDRESS })
+    getPegOutState = jest.fn<any>().mockResolvedValue(1)
+    signer = { getAddress: jest.fn<any>().mockResolvedValue(REFUND_ADDRESS) }
+    jest.mocked(ethers.Contract).mockImplementation(() => ({
+      address: ESCROW_ADDRESS, signer, requestPegOut, cancelPegOut, getPegOutQuote, getPegOutState
+    }) as any)
   })
 
   test('throw when neither a network default nor a custom address is available', () => {
@@ -87,5 +95,39 @@ describe('PegOutEscrowContract should', () => {
     wait.mockResolvedValue(receipt([{ event: 'EscrowPegOutChangePaid', args: {} }]))
     await expect(new PegOutEscrowContract(connectionMock, config).requestPegOut(DESTINATION, REFUND_ADDRESS, VALUE))
       .rejects.toMatchObject({ details: `requestPegOut transaction ${TX_HASH} emitted no PegOutRequested event` })
+  })
+
+  test('send one cancelPegOut transaction for the id and return its hash', async () => {
+    const txHash = await new PegOutEscrowContract(connectionMock, config).cancelPegOut(REQUEST_HASH.slice(2))
+    expect(cancelPegOut).toBeCalledTimes(1)
+    expect(cancelPegOut).toBeCalledWith(REQUEST_HASH)
+    expect(txHash).toBe(TX_HASH)
+  })
+
+  test('throw an error carrying the transaction hash when the mined cancel reverted', async () => {
+    cancelPegOut.mockResolvedValue({ hash: TX_HASH, wait: jest.fn<any>().mockRejectedValue(new Error('transaction failed')) })
+    await expect(new PegOutEscrowContract(connectionMock, config).cancelPegOut(REQUEST_HASH))
+      .rejects.toMatchObject({ message: 'Peg-out cancel reverted', details: { txHash: TX_HASH, reason: 'transaction failed' } })
+  })
+
+  test.each([[0, 'NONE'], [1, 'REQUESTED'], [2, 'CLAIMED'], [3, 'CANCELLED'], [4, 'FULFILLED'], [5, 'REFUNDED']])(
+    'read state %i as %s at the given block', async (onchain, state) => {
+      getPegOutState.mockResolvedValue(onchain)
+      const result = await new PegOutEscrowContract(connectionMock, config).getPegOutState(REQUEST_HASH.slice(2), 77)
+      expect(getPegOutState).toBeCalledWith(REQUEST_HASH, { blockTag: 77 })
+      expect(result).toBe(state)
+    })
+
+  test('read the refund address of a stored peg-out at the given block', async () => {
+    const refundAddress = await new PegOutEscrowContract(connectionMock, config).getRefundAddress(REQUEST_HASH, 77)
+    expect(getPegOutQuote).toBeCalledWith(REQUEST_HASH, { blockTag: 77 })
+    expect(refundAddress).toBe(REFUND_ADDRESS)
+  })
+
+  test('read the sender from the signer, and fail on a read-only connection', async () => {
+    await expect(new PegOutEscrowContract(connectionMock, config).getSenderAddress()).resolves.toBe(REFUND_ADDRESS)
+    signer = null
+    await expect(new PegOutEscrowContract(connectionMock, config).getSenderAddress())
+      .rejects.toMatchObject({ details: 'a signing RSK connection is required to send PegOutEscrow transactions' })
   })
 })
