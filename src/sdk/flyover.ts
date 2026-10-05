@@ -52,6 +52,7 @@ import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfiguratio
 import { estimatePegout, type PegoutEstimate } from './estimatePegout'
 import { PegOutEscrowContract, type PegoutRequest } from '../blockchain/pegoutEscrow'
 import { requestPegout } from './requestPegout'
+import { cancelPegout } from './cancelPegout'
 
 /** Class that represents the entrypoint to the Flyover SDK */
 export class Flyover implements Bridge {
@@ -740,6 +741,24 @@ export class Flyover implements Bridge {
     this.ensureFlyoverConfigurations()
     this.ensurePegOutEscrow()
     return requestPegout(this.getFlyoverContext(), destinationAddress, refundAddress, value)
+  }
+
+  /**
+   * Cancels a commit-first peg-out that no liquidity provider has claimed yet, with one
+   * PegOutEscrow.cancelPegOut transaction. The escrow refunds the whole deposit to the refund address
+   * and slashes nobody. Only the refund address can cancel, so the connection must sign as it.
+   *
+   * @param { string } requestHash The peg-out id returned by {@link Flyover.requestPegOut}
+   *
+   * @returns { string } The transaction hash
+   *
+   * @throws { FlyoverError } `InvalidState` when the peg-out is not REQUESTED (claimed, already cancelled,
+   * refunded or unknown), `InvalidSender` when the connection is not the refund address, or when the
+   * mined transaction reverted
+   */
+  async cancelPegOut (requestHash: string): Promise<string> {
+    this.ensurePegOutEscrow()
+    return cancelPegout(this.getFlyoverContext(), requestHash)
   }
 
   private getFlyoverContext (): FlyoverSDKContext {
