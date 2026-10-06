@@ -1,6 +1,6 @@
 import { describe, test, jest, expect, beforeEach } from '@jest/globals'
 import { type BlockchainConnection, ethers, type FlyoverConfig } from '@rsksmart/bridges-core-sdk'
-import { PegOutEscrowContract } from './pegoutEscrow'
+import { isPegoutId, PegOutEscrowContract } from './pegoutEscrow'
 
 jest.mock('ethers')
 
@@ -34,6 +34,7 @@ describe('PegOutEscrowContract should', () => {
   let cancelPegOut: jest.Mock<any>
   let getPegOutQuote: jest.Mock<any>
   let getPegOutState: jest.Mock<any>
+  let requestIdAt: jest.Mock<any>
   let wait: jest.Mock<any>
   let signer: { getAddress: jest.Mock<any> } | null
 
@@ -43,9 +44,10 @@ describe('PegOutEscrowContract should', () => {
     cancelPegOut = jest.fn<any>().mockResolvedValue({ hash: TX_HASH, wait: jest.fn<any>().mockResolvedValue(receipt([])) })
     getPegOutQuote = jest.fn<any>().mockResolvedValue({ nonce: BigNumber.from(7), rskRefundAddress: REFUND_ADDRESS })
     getPegOutState = jest.fn<any>().mockResolvedValue(1)
+    requestIdAt = jest.fn<any>().mockResolvedValue(REQUEST_HASH)
     signer = { getAddress: jest.fn<any>().mockResolvedValue(REFUND_ADDRESS) }
     jest.mocked(ethers.Contract).mockImplementation(() => ({
-      address: ESCROW_ADDRESS, signer, requestPegOut, cancelPegOut, getPegOutQuote, getPegOutState
+      address: ESCROW_ADDRESS, signer, requestPegOut, cancelPegOut, getPegOutQuote, getPegOutState, requestIdAt
     }) as any)
   })
 
@@ -129,5 +131,20 @@ describe('PegOutEscrowContract should', () => {
     signer = null
     await expect(new PegOutEscrowContract(connectionMock, config).getSenderAddress())
       .rejects.toMatchObject({ details: 'a signing RSK connection is required to send PegOutEscrow transactions' })
+  })
+
+  test('read the current id of a nonce at the given block', async () => {
+    const currentId = await new PegOutEscrowContract(connectionMock, config).requestIdAt(BigInt(7), 77)
+    expect(requestIdAt).toBeCalledWith(BigInt(7), { blockTag: 77 })
+    expect(currentId).toBe(REQUEST_HASH)
+  })
+
+  test.each([
+    [REQUEST_HASH, true],
+    [REQUEST_HASH.slice(2), true],
+    ['0x1234', false],
+    ['zz'.repeat(32), false]
+  ])('tell whether %s is a peg-out id', (value, expected) => {
+    expect(isPegoutId(value)).toBe(expected)
   })
 })

@@ -50,9 +50,10 @@ import { PegOutContract } from '../blockchain/pegout'
 import { DiscoveryContract } from '../blockchain/discovery'
 import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfigurations'
 import { estimatePegout, type PegoutEstimate } from './estimatePegout'
-import { PegOutEscrowContract, type PegoutRequest } from '../blockchain/pegoutEscrow'
+import { PegOutEscrowContract, type PegoutRequest, type PegoutState } from '../blockchain/pegoutEscrow'
 import { requestPegout } from './requestPegout'
 import { cancelPegout } from './cancelPegout'
+import { getPegoutState } from './getPegoutState'
 
 /** Class that represents the entrypoint to the Flyover SDK */
 export class Flyover implements Bridge {
@@ -759,6 +760,22 @@ export class Flyover implements Bridge {
   async cancelPegOut (requestHash: string): Promise<string> {
     this.ensurePegOutEscrow()
     return cancelPegout(this.getFlyoverContext(), requestHash)
+  }
+
+  /**
+   * Reads the state of a commit-first peg-out from the PegOutEscrow, for its whole life: REQUESTED,
+   * CLAIMED, FULFILLED, CANCELLED or REFUNDED, or NONE for an id the escrow never issued. It makes no
+   * request to a liquidity provider.
+   *
+   * @param { string } requestHash The peg-out id returned by {@link Flyover.requestPegOut}
+   * @param { bigint } nonce The nonce returned by {@link Flyover.requestPegOut}. An LP claim moves the peg-out
+   * to a new id; without the nonce a claimed peg-out reads NONE
+   *
+   * @returns { PegoutState } The current state of the peg-out
+   */
+  async getPegOutState (requestHash: string, nonce?: bigint): Promise<PegoutState> {
+    this.ensurePegOutEscrow()
+    return getPegoutState(this.getFlyoverContext(), requestHash, nonce)
   }
 
   private getFlyoverContext (): FlyoverSDKContext {

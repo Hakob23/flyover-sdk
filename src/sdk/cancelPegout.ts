@@ -1,9 +1,8 @@
 import { assertTruthy } from '@rsksmart/bridges-core-sdk'
+import { isPegoutId } from '../blockchain/pegoutEscrow'
 import { FlyoverError } from '../client/httpClient'
 import { type FlyoverSDKContext } from '../utils/interfaces'
 import { isTextEqualNoCase } from '../utils/validation'
-
-const REQUEST_HASH = /^(0x)?[0-9a-fA-F]{64}$/
 
 /**
  * Cancels a commit-first peg-out that no LP has claimed yet, with one PegOutEscrow.cancelPegOut
@@ -19,7 +18,7 @@ export async function cancelPegout (context: FlyoverSDKContext, requestHash: str
   assertTruthy(rskConnection, 'Missing RSK connection')
   assertTruthy(lbc, 'Missing Liquidity Bridge Contract')
   assertTruthy(lbc.pegOutEscrow, 'Missing PegOutEscrow contract')
-  if (!REQUEST_HASH.test(requestHash)) {
+  if (!isPegoutId(requestHash)) {
     throw FlyoverError.withReason(`invalid peg-out id ${requestHash}`)
   }
 
