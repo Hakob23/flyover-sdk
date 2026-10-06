@@ -8,6 +8,11 @@ import { FlyoverError } from '../client/httpClient'
 export const PEGOUT_STATES = ['NONE', 'REQUESTED', 'CLAIMED', 'CANCELLED', 'FULFILLED', 'REFUNDED'] as const
 export type PegoutState = typeof PEGOUT_STATES[number]
 
+/** Whether the value is a 32-byte peg-out id, with or without the 0x prefix. */
+export function isPegoutId (value: string): boolean {
+  return /^(0x)?[0-9a-fA-F]{64}$/.test(value)
+}
+
 /** A commit-first peg-out request mined on the PegOutEscrow. */
 export interface PegoutRequest {
   /** Id of the peg-out until an LP claims it, without the 0x prefix */
@@ -84,6 +89,14 @@ export class PegOutEscrowContract {
   async getPegOutState (requestHash: string, blockTag: number): Promise<PegoutState> {
     const state = await executeContractView<number>(this.escrowContract, 'getPegOutState', with0x(requestHash), { blockTag })
     return PEGOUT_STATES[state] ?? 'NONE'
+  }
+
+  /**
+   * Reads the current id of the peg-out with the given escrow nonce: its request id until an LP claims
+   * it, then the id the claim moved it to. Reads the zero hash for a nonce the escrow never issued.
+   */
+  async requestIdAt (nonce: bigint, blockTag: number): Promise<string> {
+    return executeContractView<string>(this.escrowContract, 'requestIdAt', nonce, { blockTag })
   }
 
   /** Reads the refund address of a stored peg-out. Reverts unless the id is REQUESTED or CLAIMED. */
