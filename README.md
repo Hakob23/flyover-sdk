@@ -115,7 +115,7 @@ The estimate also returns the BTC confirmations the payment needs and two deadli
     const { requestHash, txHash, nonce } = await flyover.requestPegOut(btcDestinationAddress, rskRefundAddress, estimate.value)
 ```
 - `requestHash` identifies the peg-out until a liquidity provider claims it. Keep it: the refund address can cancel the request with it while it is unclaimed.
-- `nonce` keeps tracking the peg-out after a claim, when the escrow moves it to a new id.
+- `nonce` keeps tracking the peg-out after a claim, when the escrow moves it to a new id: `flyover.getPegOutState(requestHash, nonce)` returns its state for its whole life.
 - `rskRefundAddress` is the only address that can cancel, and it receives every refund. It cannot be the zero address.
 
 ## Supported addresses
