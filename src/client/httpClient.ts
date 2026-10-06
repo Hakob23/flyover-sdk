@@ -144,6 +144,43 @@ export class FlyoverError extends BridgeError {
     })
   }
 
+  static pegoutCancelReverted (args: { txHash: string, reason: string }): FlyoverError {
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: false,
+      message: 'Peg-out cancel reverted',
+      details: { txHash: args.txHash, reason: args.reason }
+    })
+  }
+
+  static pegoutInvalidState (args: { requestHash: string, expected: string, actual: string }): FlyoverError {
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: false,
+      message: 'InvalidState',
+      details: {
+        requestHash: args.requestHash,
+        expected: args.expected,
+        actual: args.actual,
+        reason: `the peg-out is ${args.actual}, not ${args.expected}`
+      }
+    })
+  }
+
+  static pegoutInvalidSender (args: { requestHash: string, expected: string, actual: string }): FlyoverError {
+    return new FlyoverError({
+      timestamp: Date.now(),
+      recoverable: false,
+      message: 'InvalidSender',
+      details: {
+        requestHash: args.requestHash,
+        expected: args.expected,
+        actual: args.actual,
+        reason: 'only the refund address of the peg-out can cancel it'
+      }
+    })
+  }
+
   static unfairPegoutConfiguration (args: { deadlineSeconds: bigint, maxSeconds: bigint, deadlineBlocks: bigint, maxBlocks: bigint }): FlyoverError {
     return new FlyoverError({
       timestamp: Date.now(),
