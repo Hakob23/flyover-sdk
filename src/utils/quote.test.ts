@@ -1,32 +1,7 @@
 import { describe, test, expect } from '@jest/globals'
-import { getQuoteTotal, isPeginQuote, isPeginStillPayable, satsToWei } from './quote'
-import { type QuoteDetail, type PegoutQuote, type Quote } from '../api'
+import { getQuoteTotal, satsToWei } from './quote'
+import { type PegoutQuote } from '../api'
 
-    const peginQuote: Quote = {
-      quote: {
-        fedBTCAddr: 'any addres',
-        lbcAddr: 'any addres',
-        lpRSKAddr: 'any addres',
-        btcRefundAddr: 'any addres',
-        rskRefundAddr: 'any addres',
-        lpBTCAddr: 'any addres',
-        callFee: BigInt('1234567890'),
-        penaltyFee: BigInt(25),
-        contractAddr: 'any addres',
-        data: 'any data',
-        gasLimit: 3,
-        nonce: BigInt(4),
-        gasFee: BigInt('2000000000000000000'),
-        value: BigInt('4000000000000000000'),
-        agreementTimestamp: 6,
-        timeForDeposit: 7,
-        lpCallTime: 8,
-        confirmations: 9,
-        callOnRegister: true,
-        chainId: 31,
-      },
-      quoteHash: 'a hash'
-    }
     const pegoutQuote: PegoutQuote = {
       quote: {
         lbcAddress: 'an address',
@@ -58,11 +33,9 @@ describe('getQuoteTotal function should', () => {
     expect(() => { getQuoteTotal(undefined as any) }).toThrow('empty quote')
   })
   test('fail if quote detail is empty', () => {
-    expect(() => { getQuoteTotal({} as Quote) }).toThrow('empty quote detail')
     expect(() => { getQuoteTotal({} as PegoutQuote) }).toThrow('empty quote detail')
   })
   test('sum properly quote value', () => {
-    expect(getQuoteTotal(peginQuote)).toBe(BigInt('6000000001234567890'))
     expect(getQuoteTotal(pegoutQuote)).toBe(BigInt('12500000000000000000'))
   })
   test('replace missing values with 0', () => {
@@ -72,55 +45,6 @@ describe('getQuoteTotal function should', () => {
       { quote: { gasFee: 5 } },
     ]
     quotes.forEach(quote => { expect(getQuoteTotal(quote)).toBe(BigInt(5)) })
-  })
-})
-
-describe('isPeginStillPayable function should', () => {
-  test('fail if quote is empty', () => {
-    expect(() => { isPeginStillPayable(null as any) }).toThrow('empty quote')
-    expect(() => { isPeginStillPayable(undefined as any) }).toThrow('empty quote')
-  })
-  test('fail if quote detail is empty', () => {
-    expect(() => { isPeginStillPayable({ quote: {}, quoteHash: 'hash 1' } as Quote) }).toThrow('Validation failed for object with following missing properties: agreementTimestamp, timeForDeposit')
-    expect(() => { isPeginStillPayable({ quote: { timeForDeposit: 10 }, quoteHash: 'hash 1' } as Quote) }).toThrow('Validation failed for object with following missing properties: agreementTimestamp')
-    expect(() => { isPeginStillPayable({ quote: { agreementTimestamp: 50 }, quoteHash: 'hash 1' } as Quote) }).toThrow('Validation failed for object with following missing properties: timeForDeposit')
-  })
-  test('return true if quote is still payable', () => {
-    const now = Date.now() / 1000
-    const testCases: { result: boolean, quote: Partial<QuoteDetail> }[] = [
-      {
-        result: false,
-        quote: {
-          agreementTimestamp: now - 3600,
-          timeForDeposit: 3600
-        }
-      },
-      {
-        result: true,
-        quote: {
-          agreementTimestamp: now,
-          timeForDeposit: 3600
-        }
-      },
-      {
-        result: true,
-        quote: {
-          agreementTimestamp: now - 10,
-          timeForDeposit: 20
-        }
-      },
-      {
-        result: false,
-        quote: {
-          agreementTimestamp: now - 10,
-          timeForDeposit: 5
-        }
-      }
-    ]
-    for (const testCase of testCases) {
-      const quote: Quote = { quote: testCase.quote as QuoteDetail, quoteHash: 'hash' }
-      expect(isPeginStillPayable(quote)).toBe(testCase.result)
-    }
   })
 })
 
@@ -141,35 +65,5 @@ describe('satsToWei function should', () => {
   })
   test('fail if sats is negative', () => {
     expect(() => { satsToWei(BigInt(-1)) }).toThrow('Negative sats value')
-  })
-
-  describe('isPeginQuote function should', () => {
-    test('return true for a pegin quote', () => {
-      expect(isPeginQuote(peginQuote)).toBe(true)
-    })
-
-    test('return false for a pegout quote', () => {
-      expect(isPeginQuote(pegoutQuote)).toBe(false)
-    })
-
-    test('return false if fedBTCAddr is missing', () => {
-      const notPeginQuote = {
-        quote: {
-          lbcAddr: 'any addres'
-        },
-        quoteHash: 'hash'
-      }
-      expect(isPeginQuote(notPeginQuote as any)).toBe(false)
-    })
-
-    test('return false if fedBTCAddr is undefined', () => {
-      const notPeginQuote = {
-        quote: {
-          fedBTCAddr: undefined
-        },
-        quoteHash: 'hash'
-      }
-      expect(isPeginQuote(notPeginQuote as any)).toBe(false)
-    })
   })
 })

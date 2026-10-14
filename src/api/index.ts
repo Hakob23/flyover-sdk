@@ -9,14 +9,11 @@ import {
 } from './bindings/data-contracts'
 
 export {
-  type AcceptPeginRespose as AcceptedQuote,
   type LiquidityProvider as LiquidityProviderBase,
   type ProviderDetail,
   type ProviderDetailResponse as LiquidityProviderDetail,
   type PeginQuoteDTO as QuoteDetail,
   type PegoutQuoteDTO as PegoutQuoteDetail,
-  type GetPeginQuoteResponse as Quote,
-  type PeginQuoteRequest,
   type PegoutQuoteRequest,
   type GetPegoutQuoteResponse as PegoutQuote,
   type AcceptPegoutResponse as AcceptedPegoutQuote,
@@ -27,10 +24,7 @@ export {
   type AvailableLiquidityDTO as AvailableLiquidity,
   type PeginCreationDataDTO as PeginCreationData,
   type RecommendedOperationDTO as RecommendedOperation,
-  PeginQuoteRequestRequiredFields as quoteRequestRequiredFields,
-  GetPeginQuoteResponseRequiredFields as quoteRequiredFields,
   PeginQuoteDtoRequiredFields as quoteDetailRequiredFields,
-  AcceptPeginResposeRequiredFields as acceptQuoteRequiredFields,
   LiquidityProviderRequiredFields as providerRequiredFields,
   PegoutQuoteRequestRequiredFields as pegoutQuoteRequestRequiredFields,
   PegoutQuoteDtoRequiredFields as pegoutQuoteDetailRequiredFields,
@@ -40,9 +34,6 @@ export {
 export type LiquidityProvider = LiquidityProviderBase & LiquidityProviderDetail
 
 export const Routes = {
-  getQuote: Pegin.PostGetQuotePath,
-  acceptQuote: Pegin.PostAcceptQuotePath,
-  acceptAuthenticatedQuote: Pegin.PostAcceptAuthenticatedQuotePath,
   getProviders: GetProviders.GetProvidersListPath,
   getPegoutQuote: Pegout.PostGetQuotesPath,
   acceptPegoutQuote: Pegout.PostAcceptQuotePath,
@@ -52,6 +43,5 @@ export const Routes = {
   peginStatus: Pegin.StatusListPath,
   pegoutStatus: Pegout.StatusListPath,
   availableLiquidity: Providers.LiquidityListPath,
-  recommendedPegin: Pegin.RecommendedListPath,
   recommendedPegout: Pegout.RecommendedListPath
 } as const

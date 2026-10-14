@@ -1,13 +1,11 @@
 import { executeContractView } from "@rsksmart/bridges-core-sdk";
 import { DiscoveryContract } from "./discovery";
-import { PegInContract } from "./pegin";
 import { PegOutContract } from "./pegout";
 import { FlyoverConfigurationsContract } from "./flyoverConfigurations";
 import { BigNumberish, Contract } from "ethers"
 import { FlyoverError } from "../client/httpClient";
 
 export interface LiquidityBridgeContract {
-    pegInContract:PegInContract
     pegOutContract:PegOutContract
     discoveryContract:DiscoveryContract
     // Commit-first contract. Optional because it is not deployed on every network yet;
