@@ -167,7 +167,7 @@ describeOnRegtest('Commit-first peg-out happy path should', () => {
     expect(nullData?.scriptHex).toBe(opReturn)
     expect(delivery.address).toBe(destination)
 
-    expect(delivery.valueInSats * SAT).toBeGreaterThanOrEqual(estimate.minimumBtcReceived)
+    expect(delivery.valueInSats * SAT).toBe(estimate.minimumBtcReceived)
   }, EXTENDED_TIMEOUT)
 
   test('settle as FULFILLED and pay the escrowed RBTC to the LP once the payment is confirmed', async () => {
