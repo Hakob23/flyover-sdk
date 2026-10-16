@@ -1,4 +1,5 @@
 import { assertTruthy, ethers, executeContractView } from '@rsksmart/bridges-core-sdk'
+import { type PegOutConfiguration } from '@rsksmart/flyover-sdk'
 
 /** The PegOutEscrow functions, events and errors the tests use when calling the contract directly. */
 export const PEGOUT_ESCROW_ABI = [
@@ -16,13 +17,7 @@ export const FLYOVER_CONFIGURATIONS_ABI = [
 ]
 
 /** The peg-out configuration fields the tests need to build values in and out of range. */
-export interface PegOutLimits {
-  fixedFee: bigint
-  percentageFee: bigint
-  maxMinerFee: bigint
-  minAmount: bigint
-  maxAmount: bigint
-}
+export type PegOutLimits = Pick<PegOutConfiguration, 'fixedFee' | 'percentageFee' | 'maxMinerFee' | 'minAmount' | 'maxAmount'>
 
 export async function readPegOutLimits (configurations: ethers.Contract): Promise<PegOutLimits> {
   const config = await executeContractView<Record<keyof PegOutLimits, ethers.BigNumber>>(configurations, 'getPegOutConfiguration')
