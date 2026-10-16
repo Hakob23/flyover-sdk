@@ -26,18 +26,18 @@ export async function getPegoutState (context: FlyoverSDKContext, requestHash: s
   }
 
   const escrow = lbc.pegOutEscrow
-  const blockNumber = await rskConnection.getChainHeight()
-  assertTruthy(blockNumber, 'Unable to read the RSK chain height')
+  const chainHeight = await rskConnection.getChainHeight()
+  assertTruthy(chainHeight, 'Unable to read the RSK chain height')
 
   // REQUESTED, CANCELLED and the no-claim REFUNDED stay under the request id
-  const state = await escrow.getPegOutState(requestHash, blockNumber)
+  const state = await escrow.getPegOutState(requestHash, chainHeight)
   if (state !== 'NONE' || nonce === undefined) {
     return state
   }
   // NONE with a nonce: either never issued, or claimed and moved to a new id
-  const currentId = await escrow.requestIdAt(nonce, blockNumber)
+  const currentId = await escrow.requestIdAt(nonce, chainHeight)
   if (ZERO_ID.test(currentId)) {
     return 'NONE'
   }
-  return escrow.getPegOutState(currentId, blockNumber)
+  return escrow.getPegOutState(currentId, chainHeight)
 }
