@@ -99,7 +99,7 @@ export class PegOutEscrowContract {
    * address once the peg-out is CANCELLED, FULFILLED or REFUNDED.
    */
   async getRefundAddress (requestHash: string, blockTag: number): Promise<string> {
-    const quote = await executeContractView<{ rskRefundAddress: string }>(
+    const quote = await executeContractView<Quotes.PegOutQuoteStructOutput>(
       this.escrowContract, 'getPegOutQuote', with0x(requestHash), { blockTag }
     )
     return quote.rskRefundAddress
