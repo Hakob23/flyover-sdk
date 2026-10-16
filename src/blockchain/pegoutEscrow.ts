@@ -94,7 +94,10 @@ export class PegOutEscrowContract {
     return PEGOUT_STATES[state] ?? 'NONE'
   }
 
-  /** Reads the refund address of a stored peg-out. Reverts unless the id is REQUESTED or CLAIMED. */
+  /**
+   * Reads the refund address of a stored peg-out. Reverts for an id that reads NONE, and reads the zero
+   * address once the peg-out is CANCELLED, FULFILLED or REFUNDED.
+   */
   async getRefundAddress (requestHash: string, blockTag: number): Promise<string> {
     const quote = await executeContractView<{ rskRefundAddress: string }>(
       this.escrowContract, 'getPegOutQuote', with0x(requestHash), { blockTag }
