@@ -13,10 +13,10 @@ const testWithClaim = claimTimeoutSeconds === undefined ? test.skip : test
 
 describe('Commit-first peg-out sad paths should', () => {
   let flyover: Flyover
-  let otherFlyover: Flyover
+  let flyoverOtherSender: Flyover
   let provider: ethers.providers.Provider
   let escrow: ethers.Contract
-  let otherEscrow: ethers.Contract
+  let escrowOtherSender: ethers.Contract
   let limits: PegOutLimits
   let refundAddress: string
   let inRangeValue: bigint
@@ -50,15 +50,15 @@ describe('Commit-first peg-out sad paths should', () => {
     // unfunded on purpose: every call it makes is rejected before a transaction is sent, so it never pays gas
     const other = await BlockchainConnection.createUsingPassphrase(ethers.Wallet.createRandom().mnemonic.phrase, nodeUrl)
     flyover = new Flyover(config)
-    otherFlyover = new Flyover(config)
+    flyoverOtherSender = new Flyover(config)
     await flyover.connectToRsk(rsk)
-    await otherFlyover.connectToRsk(other)
+    await flyoverOtherSender.connectToRsk(other)
 
     const underlying = rsk.getUnderlyingProvider()
     assertTruthy(underlying, 'Missing RSK provider')
     provider = underlying
     escrow = new ethers.Contract(pegOutEscrowAddress, PEGOUT_ESCROW_ABI, rsk.signer)
-    otherEscrow = escrow.connect(other.signer)
+    escrowOtherSender = escrow.connect(other.signer)
     limits = await readPegOutLimits(new ethers.Contract(flyoverConfigurationsAddress, FLYOVER_CONFIGURATIONS_ABI, provider))
     refundAddress = await rsk.getConnectedAddress()
     inRangeValue = pegoutValueForAmount(limits.minAmount, limits)
@@ -88,8 +88,8 @@ describe('Commit-first peg-out sad paths should', () => {
     assertTruthy(nonce, 'Missing request nonce')
 
     // AC-8, in the SDK and in the escrow itself
-    await expect(otherFlyover.cancelPegOut(requestHash)).rejects.toMatchObject({ message: 'InvalidSender' })
-    expect(await revertErrorName(staticCall(otherEscrow, 'cancelPegOut', '0x' + requestHash), escrow)).toBe('InvalidSender')
+    await expect(flyoverOtherSender.cancelPegOut(requestHash)).rejects.toMatchObject({ message: 'InvalidSender' })
+    expect(await revertErrorName(staticCall(escrowOtherSender, 'cancelPegOut', '0x' + requestHash), escrow)).toBe('InvalidSender')
     await expect(flyover.getPegOutState(requestHash, nonce)).resolves.toBe('REQUESTED')
 
     // give the deposit back
