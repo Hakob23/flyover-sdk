@@ -1,6 +1,7 @@
 import { BridgeError, type Connection, executeContractView, type FlyoverConfig, isRskAddress } from '@rsksmart/bridges-core-sdk'
-import { type BigNumber, type BytesLike, Contract, type ContractReceipt, type ContractTransaction } from 'ethers'
+import { type BytesLike, Contract, type ContractReceipt, type ContractTransaction } from 'ethers'
 import abi from './pegout-escrow-abi'
+import { type Quotes } from './bindings/Pegout'
 import { FlyoverNetworks, type FlyoverSupportedNetworks } from '../constants/networks'
 import { FlyoverError } from '../client/httpClient'
 
@@ -77,10 +78,10 @@ export class PegOutEscrowContract {
 
   private async readNonce (requestHash: string, blockTag: number): Promise<bigint | undefined> {
     try {
-      const quote = await executeContractView<{ nonce: BigNumber }>(
+      const quote = await executeContractView<Quotes.PegOutQuoteStructOutput>(
         this.escrowContract, 'getPegOutQuote', requestHash, { blockTag }
       )
-      return BigInt(quote.nonce.toString())
+      return quote.nonce.toBigInt()
     } catch {
       // an LP claimed the request in the same block, so the request id no longer resolves there
       return undefined
