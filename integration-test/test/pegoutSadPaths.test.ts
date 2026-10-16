@@ -72,12 +72,11 @@ describe('Commit-first peg-out sad paths should', () => {
 
     const cancelTx = await flyover.cancelPegOut(requestHash)
 
-    // AC-1
     await expect(flyover.getPegOutState(requestHash, nonce)).resolves.toBe('CANCELLED')
-    // AC-2: everything sent came back, so the account only paid gas for its two transactions
+    // everything sent came back, so the account only paid gas for its two transactions
     const spentOnGas = await gasCost(provider, requestTx) + await gasCost(provider, cancelTx)
     expect(await balanceOf(refundAddress)).toBe(balanceBefore - spentOnGas)
-    // AC-3: the only event is the escrow's PegOutCancelled, so no collateral moved
+    // the only event is the escrow's PegOutCancelled, so no collateral moved
     const { logs } = await provider.getTransactionReceipt(cancelTx)
     expect(logs.map(log => log.address.toLowerCase())).toEqual([escrow.address.toLowerCase()])
     expect(logs.map(log => escrow.interface.parseLog(log).name)).toEqual(['PegOutCancelled'])
@@ -87,7 +86,7 @@ describe('Commit-first peg-out sad paths should', () => {
     const { requestHash, nonce } = await flyover.requestPegOut(destination, refundAddress, inRangeValue)
     assertTruthy(nonce, 'Missing request nonce')
 
-    // AC-8, in the SDK and in the escrow itself
+    // rejected by the SDK and by the escrow itself
     await expect(flyoverOtherSender.cancelPegOut(requestHash)).rejects.toMatchObject({ message: 'InvalidSender' })
     expect(await revertErrorName(staticCall(escrowOtherSender, 'cancelPegOut', '0x' + requestHash), escrow)).toBe('InvalidSender')
     await expect(flyover.getPegOutState(requestHash, nonce)).resolves.toBe('REQUESTED')
@@ -100,7 +99,7 @@ describe('Commit-first peg-out sad paths should', () => {
     const value = pegoutValueForAmount(limits.minAmount - SAT_TO_WEI, limits)
     const balanceBefore = await balanceOf(refundAddress)
 
-    // AC-6, in the SDK and in the escrow itself
+    // rejected by the SDK and by the escrow itself
     await expect(flyover.requestPegOut(destination, refundAddress, value))
       .rejects.toMatchObject({ message: 'Peg-out not serviceable', details: { violatedBound: 'minAmount' } })
     expect(await balanceOf(refundAddress)).toBe(balanceBefore)
@@ -112,7 +111,7 @@ describe('Commit-first peg-out sad paths should', () => {
     const value = pegoutValueForAmount(limits.maxAmount + SAT_TO_WEI, limits)
     const balanceBefore = await balanceOf(refundAddress)
 
-    // AC-7, in the SDK and in the escrow itself
+    // rejected by the SDK and by the escrow itself
     await expect(flyover.requestPegOut(destination, refundAddress, value))
       .rejects.toMatchObject({ message: 'Peg-out not serviceable', details: { violatedBound: 'maxAmount' } })
     expect(await balanceOf(refundAddress)).toBe(balanceBefore)
@@ -131,11 +130,10 @@ describe('Commit-first peg-out sad paths should', () => {
     await waitForState(requestHash, nonce, 'CLAIMED', claimTimeoutSeconds)
     const balanceBefore = await balanceOf(refundAddress)
 
-    // AC-4: the claim moved the peg-out to a new id, so the request id reads NONE
+    // the claim moved the peg-out to a new id, so the request id reads NONE
     await expect(flyover.cancelPegOut(requestHash))
       .rejects.toMatchObject({ message: 'InvalidState', details: { actual: 'NONE' } })
     expect(await revertErrorName(staticCall(escrow, 'cancelPegOut', '0x' + requestHash), escrow)).toBe('InvalidState')
-    // AC-5
     await expect(flyover.getPegOutState(requestHash, nonce)).resolves.toBe('CLAIMED')
     expect(await balanceOf(refundAddress)).toBe(balanceBefore)
   }, EXTENDED_TIMEOUT)
