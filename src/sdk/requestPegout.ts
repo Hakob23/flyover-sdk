@@ -1,5 +1,5 @@
 import {
-  assertTruthy, decodeBtcAddress, type FlyoverConfig, isBtcAddress, isBtcMainnetAddress, isBtcTestnetAddress, isRskAddress
+  assertTruthy, type FlyoverConfig, isBtcAddress, isBtcMainnetAddress, isBtcTestnetAddress, isRskAddress
 } from '@rsksmart/bridges-core-sdk'
 import { type PegoutRequest } from '../blockchain/pegoutEscrow'
 import { FlyoverError } from '../client/httpClient'
@@ -41,7 +41,7 @@ export async function requestPegout (
   const { amount } = splitPegoutValue(value, pegOutConfig, BigInt(0))
   assertPegoutServiceable(amount, pegOutConfig)
 
-  return lbc.pegOutEscrow.requestPegOut(decodeBtcAddress(destinationAddress), refundAddress, value)
+  return lbc.pegOutEscrow.requestPegOut(destinationAddress, refundAddress, value)
 }
 
 function validateDestinationAddress (config: FlyoverConfig, address: string): void {

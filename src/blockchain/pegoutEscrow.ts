@@ -1,5 +1,7 @@
-import { BridgeError, type Connection, executeContractView, type FlyoverConfig, isRskAddress } from '@rsksmart/bridges-core-sdk'
-import { type BytesLike, Contract, type ContractReceipt, type ContractTransaction } from 'ethers'
+import {
+  BridgeError, type Connection, decodeBtcAddress, executeContractView, type FlyoverConfig, isRskAddress
+} from '@rsksmart/bridges-core-sdk'
+import { Contract, type ContractReceipt, type ContractTransaction } from 'ethers'
 import abi from './pegout-escrow-abi'
 import { type Quotes } from './bindings/Pegout'
 import { FlyoverNetworks, type FlyoverSupportedNetworks } from '../constants/networks'
@@ -40,17 +42,17 @@ export class PegOutEscrowContract {
   /**
    * Sends PegOutEscrow.requestPegOut with the given value and waits for it to be mined.
    *
-   * @param destinationAddress the decoded BTC destination address
+   * @param destinationAddress the BTC address that receives the peg-out
    * @param refundAddress the RSK address that can cancel the request and receives every refund
    * @param value the RBTC to escrow, in wei
    *
    * @throws { BridgeError } When the transaction cannot be sent
    * @throws { FlyoverError } When the transaction is mined but reverts; the error carries its hash
    */
-  async requestPegOut (destinationAddress: BytesLike, refundAddress: string, value: bigint): Promise<PegoutRequest> {
+  async requestPegOut (destinationAddress: string, refundAddress: string, value: bigint): Promise<PegoutRequest> {
     let tx: ContractTransaction
     try {
-      tx = await this.escrowContract.requestPegOut(destinationAddress, refundAddress, { value })
+      tx = await this.escrowContract.requestPegOut(decodeBtcAddress(destinationAddress), refundAddress, { value })
     } catch (error) {
       throw new BridgeError({
         timestamp: Date.now(),

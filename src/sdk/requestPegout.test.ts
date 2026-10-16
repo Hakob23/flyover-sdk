@@ -1,5 +1,4 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals'
-import { decodeBtcAddress } from '@rsksmart/bridges-core-sdk'
 import { requestPegout } from './requestPegout'
 import { type PegOutConfiguration } from '../blockchain/flyoverConfigurations'
 import { type FlyoverSDKContext } from '../utils/interfaces'
@@ -59,7 +58,7 @@ describe('requestPegout should', () => {
     const result = await requestPegout(mocks.context, DESTINATION, REFUND_ADDRESS, VALUE)
 
     expect(mocks.escrowRequest).toBeCalledTimes(1)
-    expect(mocks.escrowRequest).toBeCalledWith(decodeBtcAddress(DESTINATION), REFUND_ADDRESS, VALUE)
+    expect(mocks.escrowRequest).toBeCalledWith(DESTINATION, REFUND_ADDRESS, VALUE)
     expect(result).toEqual(RESULT)
   })
 
