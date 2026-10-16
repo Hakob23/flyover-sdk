@@ -5,6 +5,8 @@ import { type Quotes } from './bindings/Pegout'
 import { FlyoverNetworks, type FlyoverSupportedNetworks } from '../constants/networks'
 import { FlyoverError } from '../client/httpClient'
 
+const REQUESTED_STATE = 1
+
 /** A commit-first peg-out request mined on the PegOutEscrow. */
 export interface PegoutRequest {
   /** Id of the peg-out until an LP claims it, without the 0x prefix */
@@ -69,23 +71,27 @@ export class PegOutEscrowContract {
     if (requestHash === undefined) {
       throw FlyoverError.withReason(`requestPegOut transaction ${tx.hash} emitted no PegOutRequested event`)
     }
-    return {
-      requestHash: requestHash.startsWith('0x') ? requestHash.slice(2) : requestHash,
-      txHash: receipt.transactionHash,
-      nonce: await this.readNonce(requestHash, receipt.blockNumber)
+    const id = requestHash.startsWith('0x') ? requestHash.slice(2) : requestHash
+    let nonce: bigint | undefined
+    try {
+      nonce = await this.readNonce(requestHash, receipt.blockNumber)
+    } catch (error) {
+      throw FlyoverError.withReason(
+        `peg-out ${id} was requested in transaction ${receipt.transactionHash}, but its nonce could not be read: ${errorMessage(error)}`
+      )
     }
+    return { requestHash: id, txHash: receipt.transactionHash, nonce }
   }
 
   private async readNonce (requestHash: string, blockTag: number): Promise<bigint | undefined> {
-    try {
-      const quote = await executeContractView<Quotes.PegOutQuoteStructOutput>(
-        this.escrowContract, 'getPegOutQuote', requestHash, { blockTag }
-      )
-      return quote.nonce.toBigInt()
-    } catch {
-      // an LP claimed the request in the same block, so the request id no longer resolves there
+    const state = await executeContractView<number>(this.escrowContract, 'getPegOutState', requestHash, { blockTag })
+    if (state !== REQUESTED_STATE) {
       return undefined
     }
+    const quote = await executeContractView<Quotes.PegOutQuoteStructOutput>(
+      this.escrowContract, 'getPegOutQuote', requestHash, { blockTag }
+    )
+    return quote.nonce.toBigInt()
   }
 }
 

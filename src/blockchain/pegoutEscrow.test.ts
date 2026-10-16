@@ -32,13 +32,15 @@ function receipt (events: unknown[]): unknown {
 describe('PegOutEscrowContract should', () => {
   let requestPegOut: jest.Mock<any>
   let getPegOutQuote: jest.Mock<any>
+  let getPegOutState: jest.Mock<any>
   let wait: jest.Mock<any>
 
   beforeEach(() => {
     wait = jest.fn<any>().mockResolvedValue(receipt([{ event: 'PegOutRequested', args: { requestHash: REQUEST_HASH } }]))
     requestPegOut = jest.fn<any>().mockResolvedValue({ hash: TX_HASH, wait })
     getPegOutQuote = jest.fn<any>().mockResolvedValue({ nonce: BigNumber.from(7) })
-    jest.mocked(ethers.Contract).mockImplementation(() => ({ address: ESCROW_ADDRESS, requestPegOut, getPegOutQuote }) as any)
+    getPegOutState = jest.fn<any>().mockResolvedValue(1)
+    jest.mocked(ethers.Contract).mockImplementation(() => ({ address: ESCROW_ADDRESS, requestPegOut, getPegOutQuote, getPegOutState }) as any)
   })
 
   test('throw when neither a network default nor a custom address is available', () => {
@@ -66,7 +68,7 @@ describe('PegOutEscrowContract should', () => {
   })
 
   test('return no nonce when the request was claimed in the same block', async () => {
-    getPegOutQuote.mockRejectedValue(new Error('QuoteNotFound'))
+    getPegOutState.mockResolvedValue(0)
     const result = await new PegOutEscrowContract(connectionMock, config).requestPegOut(DESTINATION, REFUND_ADDRESS, VALUE)
     expect(result).toEqual({ requestHash: REQUEST_HASH.slice(2), txHash: TX_HASH, nonce: undefined })
   })
