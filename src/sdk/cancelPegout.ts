@@ -24,14 +24,14 @@ export async function cancelPegout (context: FlyoverSDKContext, requestHash: str
   }
 
   const escrow = lbc.pegOutEscrow
-  const blockNumber = await rskConnection.getChainHeight()
-  assertTruthy(blockNumber, 'Unable to read the RSK chain height')
-  const state = await escrow.getPegOutState(requestHash, blockNumber)
+  const chainHeight = await rskConnection.getChainHeight()
+  assertTruthy(chainHeight, 'Unable to read the RSK chain height')
+  const state = await escrow.getPegOutState(requestHash, chainHeight)
   if (state !== 'REQUESTED') {
     throw FlyoverError.pegoutInvalidState({ requestHash, expected: 'REQUESTED', actual: state })
   }
   const [refundAddress, sender] = await Promise.all([
-    escrow.getRefundAddress(requestHash, blockNumber),
+    escrow.getRefundAddress(requestHash, chainHeight),
     escrow.getSenderAddress()
   ])
   if (!isTextEqualNoCase(refundAddress, sender)) {
