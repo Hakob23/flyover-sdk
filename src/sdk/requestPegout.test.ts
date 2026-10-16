@@ -78,7 +78,7 @@ describe('requestPegout should', () => {
     expect(mocks.escrowRequest).not.toBeCalled()
   })
 
-  test('reject a value that does not cover fixedFee + maxMinerFee before sending', async () => {
+  test('reject a value that is not above fixedFee + maxMinerFee before sending', async () => {
     const reserved = regtestConfig.fixedFee + regtestConfig.maxMinerFee
     await expect(requestPegout(mocks.context, DESTINATION, REFUND_ADDRESS, reserved)).rejects.toMatchObject({
       message: 'Peg-out value too low',
