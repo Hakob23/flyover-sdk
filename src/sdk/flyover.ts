@@ -404,32 +404,27 @@ export class Flyover implements Bridge {
     }
   }
 
-  private checkLbc (): void {
-    if (this.config.rskConnection === undefined) {
+  private checkLbc (): { lbc: LiquidityBridgeContract, rskConnection: Connection } {
+    const rskConnection = this.config.rskConnection
+    if (rskConnection === undefined) {
       throw new Error('Not connected to RSK')
-    } else if (this.liquidityBridgeContract === undefined) {
-      this.liquidityBridgeContract = {
-        pegInContract:  new PegInContract(this.config.rskConnection, this.config),
-        pegOutContract:  new PegOutContract(this.config.rskConnection, this.config),
-        discoveryContract: new DiscoveryContract(this.config.rskConnection, this.config)
-      }
     }
+    this.liquidityBridgeContract ??= {
+      pegInContract: new PegInContract(rskConnection, this.config),
+      pegOutContract: new PegOutContract(rskConnection, this.config),
+      discoveryContract: new DiscoveryContract(rskConnection, this.config)
+    }
+    return { lbc: this.liquidityBridgeContract, rskConnection }
   }
 
   private ensureFlyoverConfigurations (): void {
-    this.checkLbc()
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const lbc = this.liquidityBridgeContract!
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    lbc.flyoverConfigurations ??= new FlyoverConfigurationsContract(this.config.rskConnection!, this.config)
+    const { lbc, rskConnection } = this.checkLbc()
+    lbc.flyoverConfigurations ??= new FlyoverConfigurationsContract(rskConnection, this.config)
   }
 
   private ensurePegOutEscrow (): void {
-    this.checkLbc()
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const lbc = this.liquidityBridgeContract!
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    lbc.pegOutEscrow ??= new PegOutEscrowContract(this.config.rskConnection!, this.config)
+    const { lbc, rskConnection } = this.checkLbc()
+    lbc.pegOutEscrow ??= new PegOutEscrowContract(rskConnection, this.config)
   }
 
   private ensureRskBridge (): void {

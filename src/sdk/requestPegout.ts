@@ -1,5 +1,5 @@
 import {
-  assertTruthy, decodeBtcAddress, type FlyoverConfig, isBtcAddress, isBtcMainnetAddress, isBtcTestnetAddress, isRskAddress
+  assertTruthy, type FlyoverConfig, isBtcAddress, isBtcMainnetAddress, isBtcTestnetAddress, isRskAddress
 } from '@rsksmart/bridges-core-sdk'
 import { type PegoutRequest } from '../blockchain/pegoutEscrow'
 import { FlyoverError } from '../client/httpClient'
@@ -34,14 +34,13 @@ export async function requestPegout (
   validateDestinationAddress(config, destinationAddress)
   validateRefundAddress(config, refundAddress)
 
-  const blockNumber = await rskConnection.getChainHeight()
-  assertTruthy(blockNumber, 'Unable to read the RSK chain height')
-  const pegOutConfig = await lbc.flyoverConfigurations.getPegOutConfiguration(blockNumber)
-  // the dust threshold only decides how the change is split, never the amount, so it is not read here
+  const chainHeight = await rskConnection.getChainHeight()
+  assertTruthy(chainHeight, 'Unable to read the RSK chain height')
+  const pegOutConfig = await lbc.flyoverConfigurations.getPegOutConfiguration(chainHeight)
   const { amount } = splitPegoutValue(value, pegOutConfig, BigInt(0))
   assertPegoutServiceable(amount, pegOutConfig)
 
-  return lbc.pegOutEscrow.requestPegOut(decodeBtcAddress(destinationAddress), refundAddress, value)
+  return lbc.pegOutEscrow.requestPegOut(destinationAddress, refundAddress, value)
 }
 
 function validateDestinationAddress (config: FlyoverConfig, address: string): void {

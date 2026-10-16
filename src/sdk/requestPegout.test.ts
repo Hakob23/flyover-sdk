@@ -1,11 +1,10 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals'
-import { decodeBtcAddress } from '@rsksmart/bridges-core-sdk'
 import { requestPegout } from './requestPegout'
 import { type PegOutConfiguration } from '../blockchain/flyoverConfigurations'
 import { type FlyoverSDKContext } from '../utils/interfaces'
+import { SAT_TO_WEI } from '../constants/units'
 
 const ETHER = BigInt('1000000000000000000')
-const SAT = BigInt('10000000000')
 
 // Provisional regtest values from liquidity-bridge-contract v3.0.0 FlyoverConfigurationsRegtest.pegOutConfig
 const regtestConfig: PegOutConfiguration = {
@@ -59,7 +58,7 @@ describe('requestPegout should', () => {
     const result = await requestPegout(mocks.context, DESTINATION, REFUND_ADDRESS, VALUE)
 
     expect(mocks.escrowRequest).toBeCalledTimes(1)
-    expect(mocks.escrowRequest).toBeCalledWith(decodeBtcAddress(DESTINATION), REFUND_ADDRESS, VALUE)
+    expect(mocks.escrowRequest).toBeCalledWith(DESTINATION, REFUND_ADDRESS, VALUE)
     expect(result).toEqual(RESULT)
   })
 
@@ -69,7 +68,7 @@ describe('requestPegout should', () => {
   })
 
   test.each([
-    ['below minAmount', VALUE - SAT * BigInt(2), 'minAmount'],
+    ['below minAmount', VALUE - SAT_TO_WEI * BigInt(2), 'minAmount'],
     ['above maxAmount', ETHER * BigInt(11), 'maxAmount']
   ])('reject a value whose amount is %s before sending', async (_case, value, violatedBound) => {
     await expect(requestPegout(mocks.context, DESTINATION, REFUND_ADDRESS, value)).rejects.toMatchObject({
@@ -79,7 +78,7 @@ describe('requestPegout should', () => {
     expect(mocks.escrowRequest).not.toBeCalled()
   })
 
-  test('reject a value that does not cover fixedFee + maxMinerFee before sending', async () => {
+  test('reject a value that is not above fixedFee + maxMinerFee before sending', async () => {
     const reserved = regtestConfig.fixedFee + regtestConfig.maxMinerFee
     await expect(requestPegout(mocks.context, DESTINATION, REFUND_ADDRESS, reserved)).rejects.toMatchObject({
       message: 'Peg-out value too low',

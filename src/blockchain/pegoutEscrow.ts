@@ -1,6 +1,9 @@
-import { BridgeError, type Connection, executeContractView, type FlyoverConfig, isRskAddress } from '@rsksmart/bridges-core-sdk'
-import { type BigNumber, type BytesLike, Contract, type ContractReceipt, type ContractTransaction, type Signer } from 'ethers'
+import {
+  BridgeError, type Connection, decodeBtcAddress, executeContractView, type FlyoverConfig, isRskAddress
+} from '@rsksmart/bridges-core-sdk'
+import { Contract, type ContractReceipt, type ContractTransaction, type Signer } from 'ethers'
 import abi from './pegout-escrow-abi'
+import { type Quotes } from './bindings/Pegout'
 import { FlyoverNetworks, type FlyoverSupportedNetworks } from '../constants/networks'
 import { FlyoverError } from '../client/httpClient'
 
@@ -41,26 +44,31 @@ export class PegOutEscrowContract {
   /**
    * Sends PegOutEscrow.requestPegOut with the given value and waits for it to be mined.
    *
-   * @param destinationAddress the decoded BTC destination address
+   * @param destinationAddress the BTC address that receives the peg-out
    * @param refundAddress the RSK address that can cancel the request and receives every refund
    * @param value the RBTC to escrow, in wei
    *
    * @throws { BridgeError } When the transaction cannot be sent
    * @throws { FlyoverError } When the transaction is mined but reverts; the error carries its hash
    */
-  async requestPegOut (destinationAddress: BytesLike, refundAddress: string, value: bigint): Promise<PegoutRequest> {
+  async requestPegOut (destinationAddress: string, refundAddress: string, value: bigint): Promise<PegoutRequest> {
     const receipt = await this.send(
-      'requestPegOut', [destinationAddress, refundAddress, { value }], FlyoverError.pegoutRequestReverted
+      'requestPegOut', [decodeBtcAddress(destinationAddress), refundAddress, { value }], FlyoverError.pegoutRequestReverted
     )
     const requestHash: string | undefined = receipt.events?.find(e => e.event === 'PegOutRequested')?.args?.requestHash
     if (requestHash === undefined) {
       throw FlyoverError.withReason(`requestPegOut transaction ${receipt.transactionHash} emitted no PegOutRequested event`)
     }
-    return {
-      requestHash: requestHash.startsWith('0x') ? requestHash.slice(2) : requestHash,
-      txHash: receipt.transactionHash,
-      nonce: await this.readNonce(requestHash, receipt.blockNumber)
+    const id = requestHash.startsWith('0x') ? requestHash.slice(2) : requestHash
+    let nonce: bigint | undefined
+    try {
+      nonce = await this.readNonce(requestHash, receipt.blockNumber)
+    } catch (error) {
+      throw FlyoverError.withReason(
+        `peg-out ${id} was requested in transaction ${receipt.transactionHash}, but its nonce could not be read: ${errorMessage(error)}`
+      )
     }
+    return { requestHash: id, txHash: receipt.transactionHash, nonce }
   }
 
   /**
@@ -129,15 +137,13 @@ export class PegOutEscrowContract {
   }
 
   private async readNonce (requestHash: string, blockTag: number): Promise<bigint | undefined> {
-    try {
-      const quote = await executeContractView<{ nonce: BigNumber }>(
-        this.escrowContract, 'getPegOutQuote', requestHash, { blockTag }
-      )
-      return BigInt(quote.nonce.toString())
-    } catch {
-      // an LP claimed the request in the same block, so the request id no longer resolves there
+    if (await this.getPegOutState(requestHash, blockTag) !== 'REQUESTED') {
       return undefined
     }
+    const quote = await executeContractView<Quotes.PegOutQuoteStructOutput>(
+      this.escrowContract, 'getPegOutQuote', requestHash, { blockTag }
+    )
+    return quote.nonce.toBigInt()
   }
 }
 

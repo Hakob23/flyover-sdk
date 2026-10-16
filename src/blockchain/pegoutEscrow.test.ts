@@ -1,5 +1,5 @@
 import { describe, test, jest, expect, beforeEach } from '@jest/globals'
-import { type BlockchainConnection, ethers, type FlyoverConfig } from '@rsksmart/bridges-core-sdk'
+import { type BlockchainConnection, decodeBtcAddress, ethers, type FlyoverConfig } from '@rsksmart/bridges-core-sdk'
 import { PegOutEscrowContract } from './pegoutEscrow'
 
 jest.mock('ethers')
@@ -15,7 +15,7 @@ const connectionMock = jest.mocked({
 const ESCROW_ADDRESS = '0x8901a2bbf639bfd21a97004ba4d7ae2bd00b8da8'
 const REQUEST_HASH = '0x' + 'ab'.repeat(32)
 const TX_HASH = '0x' + 'cd'.repeat(32)
-const DESTINATION = new Uint8Array([1, 2, 3])
+const DESTINATION = 'mxqk28jvEtvjxRN8k7W9hFEJfWz5VcUgHW'
 const REFUND_ADDRESS = '0x79568c2989232dCa1840087D73d403602364c0D4'
 const VALUE = BigInt('5605000000000000')
 
@@ -64,7 +64,7 @@ describe('PegOutEscrowContract should', () => {
     const result = await new PegOutEscrowContract(connectionMock, config).requestPegOut(DESTINATION, REFUND_ADDRESS, VALUE)
 
     expect(requestPegOut).toBeCalledTimes(1)
-    expect(requestPegOut).toBeCalledWith(DESTINATION, REFUND_ADDRESS, { value: VALUE })
+    expect(requestPegOut).toBeCalledWith(decodeBtcAddress(DESTINATION), REFUND_ADDRESS, { value: VALUE })
     expect(result).toEqual({ requestHash: REQUEST_HASH.slice(2), txHash: TX_HASH, nonce: BigInt(7) })
   })
 
@@ -74,7 +74,7 @@ describe('PegOutEscrowContract should', () => {
   })
 
   test('return no nonce when the request was claimed in the same block', async () => {
-    getPegOutQuote.mockRejectedValue(new Error('QuoteNotFound'))
+    getPegOutState.mockResolvedValue(0)
     const result = await new PegOutEscrowContract(connectionMock, config).requestPegOut(DESTINATION, REFUND_ADDRESS, VALUE)
     expect(result).toEqual({ requestHash: REQUEST_HASH.slice(2), txHash: TX_HASH, nonce: undefined })
   })
