@@ -34,9 +34,9 @@ export async function requestPegout (
   validateDestinationAddress(config, destinationAddress)
   validateRefundAddress(config, refundAddress)
 
-  const blockNumber = await rskConnection.getChainHeight()
-  assertTruthy(blockNumber, 'Unable to read the RSK chain height')
-  const pegOutConfig = await lbc.flyoverConfigurations.getPegOutConfiguration(blockNumber)
+  const chainHeight = await rskConnection.getChainHeight()
+  assertTruthy(chainHeight, 'Unable to read the RSK chain height')
+  const pegOutConfig = await lbc.flyoverConfigurations.getPegOutConfiguration(chainHeight)
   // the dust threshold only decides how the change is split, never the amount, so it is not read here
   const { amount } = splitPegoutValue(value, pegOutConfig, BigInt(0))
   assertPegoutServiceable(amount, pegOutConfig)
