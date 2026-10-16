@@ -2,8 +2,8 @@ import { assertTruthy } from '@rsksmart/bridges-core-sdk'
 import { type PegOutConfiguration } from '../blockchain/flyoverConfigurations'
 import { FlyoverError } from '../client/httpClient'
 import { type FlyoverSDKContext } from '../utils/interfaces'
+import { SAT_TO_WEI } from '../constants/units'
 
-const SAT_TO_WEI = BigInt('10000000000')
 const FEE_PERCENTAGE_DENOMINATOR = BigInt(10_000)
 // PegOutContract caps a quote's deadlines at the native peg-out's: 36 hours and 4000 blocks
 const NATIVE_PEGOUT_SECONDS = BigInt(129_600)
@@ -68,15 +68,13 @@ export function calculatePegoutFee (
  * @param value the RBTC sent with the request, in wei
  * @param config the active peg-out configuration
  * @param dustThreshold `PegOutContract.dustThreshold`, in wei
- * @param feeFor the peg-out fee for the derived principal; defaults to {@link calculatePegoutFee}
  *
  * @throws { FlyoverError } When the value cannot cover `fixedFee + maxMinerFee` and its own fee
  */
 export function splitPegoutValue (
   value: bigint,
   config: Pick<PegOutConfiguration, 'fixedFee' | 'percentageFee' | 'maxMinerFee'>,
-  dustThreshold: bigint,
-  feeFor: (amount: bigint) => bigint = amount => calculatePegoutFee(config, amount)
+  dustThreshold: bigint
 ): PegoutValueSplit {
   const gasFee = config.maxMinerFee
   if (value <= config.fixedFee + gasFee) {
@@ -85,7 +83,7 @@ export function splitPegoutValue (
   let amount = ((value - config.fixedFee - gasFee) * FEE_PERCENTAGE_DENOMINATOR) /
     (FEE_PERCENTAGE_DENOMINATOR + config.percentageFee)
   amount -= amount % SAT_TO_WEI
-  let callFee = feeFor(amount)
+  let callFee = calculatePegoutFee(config, amount)
   const required = amount + callFee + gasFee
   if (value < required) {
     throw FlyoverError.pegoutInsufficientValue({ value, minimum: required })
@@ -146,12 +144,14 @@ export async function estimatePegout (context: FlyoverSDKContext, amount: bigint
     configurations.getRequiredPegOutBtcConfirmations(amount, block.number)
   ])
 
-  const value = pegoutValueForAmount(amount, config)
-  // feeFor is only asked for the derived principal, which the check below pins to `amount`
-  const split = splitPegoutValue(value, config, dustThreshold, () => onchainFee)
-  if (split.amount !== amount) {
-    throw FlyoverError.withReason(`peg-out estimate derived ${split.amount.toString()} instead of ${amount.toString()}`)
+  const sdkFee = calculatePegoutFee(config, amount)
+  if (sdkFee !== onchainFee) {
+    throw FlyoverError.withReason(
+      `peg-out fee mismatch: the SDK computes ${sdkFee.toString()}, FlyoverConfigurations returns ${onchainFee.toString()}`
+    )
   }
+  const value = pegoutValueForAmount(amount, config)
+  const split = splitPegoutValue(value, config, dustThreshold)
 
   assertPegoutServiceable(amount, config)
 
@@ -180,7 +180,12 @@ export async function estimatePegout (context: FlyoverSDKContext, amount: bigint
  */
 export function assertPegoutServiceable (amount: bigint, config: PegOutConfiguration): void {
   if (amount < config.minAmount || amount > config.maxAmount) {
-    throw FlyoverError.pegoutNotServiceable({ amount, minAmount: config.minAmount, maxAmount: config.maxAmount })
+    throw FlyoverError.pegoutNotServiceable({
+      amount,
+      minAmount: config.minAmount,
+      maxAmount: config.maxAmount,
+      violatedBound: amount < config.minAmount ? 'minAmount' : 'maxAmount'
+    })
   }
   const deadlineSeconds = config.claimWindow + config.expireTime
   const deadlineBlocks = config.claimWindowBlocks + config.expireBlocks

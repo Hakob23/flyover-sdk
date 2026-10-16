@@ -120,8 +120,7 @@ export class FlyoverError extends BridgeError {
     })
   }
 
-  static pegoutNotServiceable (args: { amount: bigint, minAmount: bigint, maxAmount: bigint }): FlyoverError {
-    const violatedBound = args.amount < args.minAmount ? 'minAmount' : 'maxAmount'
+  static pegoutNotServiceable (args: { amount: bigint, minAmount: bigint, maxAmount: bigint, violatedBound: 'minAmount' | 'maxAmount' }): FlyoverError {
     return new FlyoverError({
       timestamp: Date.now(),
       recoverable: false,
@@ -130,7 +129,7 @@ export class FlyoverError extends BridgeError {
         amount: args.amount.toString(),
         minAmount: args.minAmount.toString(),
         maxAmount: args.maxAmount.toString(),
-        violatedBound
+        violatedBound: args.violatedBound
       }
     })
   }
