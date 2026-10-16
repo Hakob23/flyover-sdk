@@ -29,6 +29,9 @@ const regtestConfig: PegOutConfiguration = {
 // v3.0.0 HelperConfig DUST_THRESHOLD_LOCAL default
 const regtestDust = BigInt(10_000)
 
+const MIN_AMOUNT_CALL_FEE = regtestConfig.fixedFee + regtestConfig.minAmount * regtestConfig.percentageFee / BigInt(10_000)
+const MIN_AMOUNT_VALUE = regtestConfig.minAmount + MIN_AMOUNT_CALL_FEE + regtestConfig.maxMinerFee
+
 const BLOCK_NUMBER = 1234
 const BLOCK_TIMESTAMP = 1_700_000_000
 
@@ -78,26 +81,26 @@ describe('calculatePegoutFee should', () => {
 
 describe('splitPegoutValue should', () => {
   test('split the value like PegOutEscrow.requestPegOut', () => {
-    const split = splitPegoutValue(BigInt('5605000000000000'), regtestConfig, regtestDust)
+    const split = splitPegoutValue(MIN_AMOUNT_VALUE, regtestConfig, regtestDust)
     expect(split).toEqual({
       amount: ETHER / BigInt(200),
-      callFee: BigInt('105000000000000'),
+      callFee: MIN_AMOUNT_CALL_FEE,
       gasFee: regtestConfig.maxMinerFee,
       change: BigInt(0)
     })
   })
 
   test('fold change below the dust threshold into the call fee', () => {
-    const value = BigInt('5605000000000000') + BigInt(5_000)
+    const value = MIN_AMOUNT_VALUE + BigInt(5_000)
     const split = splitPegoutValue(value, regtestConfig, regtestDust)
-    expect(split.callFee).toBe(BigInt('105000000005000'))
+    expect(split.callFee).toBe(MIN_AMOUNT_CALL_FEE + BigInt(5_000))
     expect(split.change).toBe(BigInt(0))
   })
 
   test('refund change at or above the dust threshold', () => {
-    const value = BigInt('5605000000000000') + regtestDust
+    const value = MIN_AMOUNT_VALUE + regtestDust
     const split = splitPegoutValue(value, regtestConfig, regtestDust)
-    expect(split.callFee).toBe(BigInt('105000000000000'))
+    expect(split.callFee).toBe(MIN_AMOUNT_CALL_FEE)
     expect(split.change).toBe(regtestDust)
   })
 
@@ -129,13 +132,13 @@ describe('pegoutValueForAmount should', () => {
   ]
 
   test.each(configs.flatMap(config => amounts.map(amount => [config, amount] as const)))(
-    'return the smallest value the escrow splits back into the amount (%#)', (config, amount) => {
+    'return a value that gives back the exact amount, and 1 wei less gives 1 sat less (%#)', (config, amount) => {
       const value = pegoutValueForAmount(amount, config)
       expect(splitPegoutValue(value, config, regtestDust).amount).toBe(amount)
       expect(splitPegoutValue(value - BigInt(1), config, regtestDust).amount).toBe(amount - SAT_TO_WEI)
     })
 
-  test('differ from amount + fee + gasFee, which the escrow splits into one satoshi less', () => {
+  test('show that amount + fee + gasFee is 1 sat short', () => {
     const amount = BigInt('5000010000000000')
     const naive = amount + calculatePegoutFee(regtestConfig, amount) + regtestConfig.maxMinerFee
     expect(splitPegoutValue(naive, regtestConfig, regtestDust).amount).toBe(amount - SAT_TO_WEI)
@@ -156,10 +159,10 @@ describe('estimatePegout should', () => {
     const depositDateLimit = BigInt(BLOCK_TIMESTAMP + 1800)
     expect(estimate).toEqual({
       amount,
-      callFee: BigInt('105000000000000'),
+      callFee: MIN_AMOUNT_CALL_FEE,
       gasFee: regtestConfig.maxMinerFee,
       change: BigInt(0),
-      value: BigInt('5605000000000000'),
+      value: MIN_AMOUNT_VALUE,
       minimumBtcReceived: amount,
       requiredConfirmations: BigInt(2),
       depositDateLimit,
