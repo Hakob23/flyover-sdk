@@ -3,8 +3,8 @@ import { calculatePegoutFee, estimatePegout, pegoutValueForAmount, splitPegoutVa
 import { type PegOutConfiguration } from '../blockchain/flyoverConfigurations'
 import { type FlyoverSDKContext } from '../utils/interfaces'
 import { FlyoverError } from '../client/httpClient'
+import { SAT_TO_WEI } from '../constants/units'
 
-const SAT = BigInt('10000000000')
 const ETHER = BigInt('1000000000000000000')
 
 // Provisional regtest values from liquidity-bridge-contract v3.0.0 FlyoverConfigurationsRegtest.pegOutConfig
@@ -28,6 +28,9 @@ const regtestConfig: PegOutConfiguration = {
 }
 // v3.0.0 HelperConfig DUST_THRESHOLD_LOCAL default
 const regtestDust = BigInt(10_000)
+
+const MIN_AMOUNT_CALL_FEE = regtestConfig.fixedFee + regtestConfig.minAmount * regtestConfig.percentageFee / BigInt(10_000)
+const MIN_AMOUNT_VALUE = regtestConfig.minAmount + MIN_AMOUNT_CALL_FEE + regtestConfig.maxMinerFee
 
 const BLOCK_NUMBER = 1234
 const BLOCK_TIMESTAMP = 1_700_000_000
@@ -72,32 +75,32 @@ describe('calculatePegoutFee should', () => {
   test('not floor a fee of at most one satoshi', () => {
     const config = { fixedFee: BigInt(0), percentageFee: BigInt(10) }
     expect(calculatePegoutFee(config, BigInt('5000000000000'))).toBe(BigInt('5000000000'))
-    expect(calculatePegoutFee(config, SAT * BigInt(1000))).toBe(SAT)
+    expect(calculatePegoutFee(config, SAT_TO_WEI * BigInt(1000))).toBe(SAT_TO_WEI)
   })
 })
 
 describe('splitPegoutValue should', () => {
   test('split the value like PegOutEscrow.requestPegOut', () => {
-    const split = splitPegoutValue(BigInt('5605000000000000'), regtestConfig, regtestDust)
+    const split = splitPegoutValue(MIN_AMOUNT_VALUE, regtestConfig, regtestDust)
     expect(split).toEqual({
       amount: ETHER / BigInt(200),
-      callFee: BigInt('105000000000000'),
+      callFee: MIN_AMOUNT_CALL_FEE,
       gasFee: regtestConfig.maxMinerFee,
       change: BigInt(0)
     })
   })
 
   test('fold change below the dust threshold into the call fee', () => {
-    const value = BigInt('5605000000000000') + BigInt(5_000)
+    const value = MIN_AMOUNT_VALUE + BigInt(5_000)
     const split = splitPegoutValue(value, regtestConfig, regtestDust)
-    expect(split.callFee).toBe(BigInt('105000000005000'))
+    expect(split.callFee).toBe(MIN_AMOUNT_CALL_FEE + BigInt(5_000))
     expect(split.change).toBe(BigInt(0))
   })
 
   test('refund change at or above the dust threshold', () => {
-    const value = BigInt('5605000000000000') + regtestDust
+    const value = MIN_AMOUNT_VALUE + regtestDust
     const split = splitPegoutValue(value, regtestConfig, regtestDust)
-    expect(split.callFee).toBe(BigInt('105000000000000'))
+    expect(split.callFee).toBe(MIN_AMOUNT_CALL_FEE)
     expect(split.change).toBe(regtestDust)
   })
 
@@ -119,7 +122,7 @@ describe('pegoutValueForAmount should', () => {
     BigInt('5000010000000000'),
     BigInt('123456780000000000'),
     BigInt('9999999990000000000'),
-    SAT
+    SAT_TO_WEI
   ]
   const configs = [
     regtestConfig,
@@ -129,16 +132,16 @@ describe('pegoutValueForAmount should', () => {
   ]
 
   test.each(configs.flatMap(config => amounts.map(amount => [config, amount] as const)))(
-    'return the smallest value the escrow splits back into the amount (%#)', (config, amount) => {
+    'return a value that gives back the exact amount, and 1 wei less gives 1 sat less (%#)', (config, amount) => {
       const value = pegoutValueForAmount(amount, config)
       expect(splitPegoutValue(value, config, regtestDust).amount).toBe(amount)
-      expect(splitPegoutValue(value - BigInt(1), config, regtestDust).amount).toBe(amount - SAT)
+      expect(splitPegoutValue(value - BigInt(1), config, regtestDust).amount).toBe(amount - SAT_TO_WEI)
     })
 
-  test('differ from amount + fee + gasFee, which the escrow splits into one satoshi less', () => {
+  test('show that amount + fee + gasFee is 1 sat short', () => {
     const amount = BigInt('5000010000000000')
     const naive = amount + calculatePegoutFee(regtestConfig, amount) + regtestConfig.maxMinerFee
-    expect(splitPegoutValue(naive, regtestConfig, regtestDust).amount).toBe(amount - SAT)
+    expect(splitPegoutValue(naive, regtestConfig, regtestDust).amount).toBe(amount - SAT_TO_WEI)
     expect(pegoutValueForAmount(amount, regtestConfig)).toBeGreaterThan(naive)
   })
 })
@@ -156,10 +159,10 @@ describe('estimatePegout should', () => {
     const depositDateLimit = BigInt(BLOCK_TIMESTAMP + 1800)
     expect(estimate).toEqual({
       amount,
-      callFee: BigInt('105000000000000'),
+      callFee: MIN_AMOUNT_CALL_FEE,
       gasFee: regtestConfig.maxMinerFee,
       change: BigInt(0),
-      value: BigInt('5605000000000000'),
+      value: MIN_AMOUNT_VALUE,
       minimumBtcReceived: amount,
       requiredConfirmations: BigInt(2),
       depositDateLimit,
@@ -210,8 +213,8 @@ describe('estimatePegout should', () => {
   })
 
   test.each([
-    [ETHER / BigInt(200) - SAT, 'minAmount'],
-    [ETHER * BigInt(10) + SAT, 'maxAmount']
+    [ETHER / BigInt(200) - SAT_TO_WEI, 'minAmount'],
+    [ETHER * BigInt(10) + SAT_TO_WEI, 'maxAmount']
   ])('reject the out of bounds amount %s naming the violated bound', async (amount, violatedBound) => {
     await expect(estimatePegout(mocks.context, amount)).rejects.toMatchObject({
       message: 'Peg-out not serviceable',
@@ -247,8 +250,8 @@ describe('estimatePegout should', () => {
   })
 
   test('fail without an RSK connection or a FlyoverConfigurations contract', async () => {
-    await expect(estimatePegout({ ...mocks.context, rskConnection: undefined }, SAT)).rejects.toThrow('Missing RSK connection')
+    await expect(estimatePegout({ ...mocks.context, rskConnection: undefined }, SAT_TO_WEI)).rejects.toThrow('Missing RSK connection')
     const lbc = { ...mocks.context.lbc, flyoverConfigurations: undefined } as any
-    await expect(estimatePegout({ ...mocks.context, lbc }, SAT)).rejects.toThrow('Missing FlyoverConfigurations contract')
+    await expect(estimatePegout({ ...mocks.context, lbc }, SAT_TO_WEI)).rejects.toThrow('Missing FlyoverConfigurations contract')
   })
 })
