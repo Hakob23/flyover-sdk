@@ -98,11 +98,13 @@ describe('Commit-first peg-out sad paths should', () => {
   test('reject an amount below minAmount without sending a transaction, as the escrow would', async () => {
     const value = pegoutValueForAmount(limits.minAmount - SAT_TO_WEI, limits)
     const balanceBefore = await balanceOf(refundAddress)
+    const txCountBefore = await provider.getTransactionCount(refundAddress, 'pending')
 
     // rejected by the SDK and by the escrow itself
     await expect(flyover.requestPegOut(destination, refundAddress, value))
       .rejects.toMatchObject({ message: 'Peg-out not serviceable', details: { violatedBound: 'minAmount' } })
     expect(await balanceOf(refundAddress)).toBe(balanceBefore)
+    expect(await provider.getTransactionCount(refundAddress, 'pending')).toBe(txCountBefore)
     const call = staticCall(escrow, 'requestPegOut', decodeBtcAddress(destination), refundAddress, { value })
     expect(await revertErrorName(call, escrow)).toBe('NotServiceable')
   }, EXTENDED_TIMEOUT)
@@ -110,11 +112,13 @@ describe('Commit-first peg-out sad paths should', () => {
   test('reject an amount above maxAmount without sending a transaction, as the escrow would', async () => {
     const value = pegoutValueForAmount(limits.maxAmount + SAT_TO_WEI, limits)
     const balanceBefore = await balanceOf(refundAddress)
+    const txCountBefore = await provider.getTransactionCount(refundAddress, 'pending')
 
     // rejected by the SDK and by the escrow itself
     await expect(flyover.requestPegOut(destination, refundAddress, value))
       .rejects.toMatchObject({ message: 'Peg-out not serviceable', details: { violatedBound: 'maxAmount' } })
     expect(await balanceOf(refundAddress)).toBe(balanceBefore)
+    expect(await provider.getTransactionCount(refundAddress, 'pending')).toBe(txCountBefore)
     // the node checks the balance before running the call, so the escrow's revert needs a balance above the value
     if (balanceBefore <= value) {
       throw new Error(`Fund ${refundAddress} with more than ${value} wei to check the escrow's revert above maxAmount`)
