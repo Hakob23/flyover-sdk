@@ -48,6 +48,8 @@ import { estimateRecommendedPegout, RecommendedPegoutExtraArgs } from './recomme
 import { PegInContract } from '../blockchain/pegin'
 import { PegOutContract } from '../blockchain/pegout'
 import { DiscoveryContract } from '../blockchain/discovery'
+import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfigurations'
+import { estimatePegout, type PegoutEstimate } from './estimatePegout'
 
 /** Class that represents the entrypoint to the Flyover SDK */
 export class Flyover implements Bridge {
@@ -184,6 +186,9 @@ export class Flyover implements Bridge {
    *
    * flyover.useProvider(provider)
    * await flyover.getPegoutQuotes(quoteRequest)
+   *
+   * @deprecated Use {@link Flyover.estimatePegOut}. Commit-first peg-outs are priced from the
+   * on-chain FlyoverConfigurations contract, so there is no liquidity provider quote to request.
    */
   async getPegoutQuotes (quoteRequest: PegoutQuoteRequest): Promise<PegoutQuote[]> {
     this.checkLiquidityProvider()
@@ -214,6 +219,9 @@ export class Flyover implements Bridge {
      * flyover.useProvider(provider)
      * const quotes = await flyover.getPegoutQuotes(quoteRequest)
      * await flyover.acceptPegoutQuote(quotes[0])
+     *
+     * @deprecated Use {@link Flyover.estimatePegOut}. Commit-first peg-outs have no counterparty
+     * when the user commits, so there is no quote to accept.
      */
   async acceptPegoutQuote (quote: PegoutQuote): Promise<AcceptedPegoutQuote> {
     this.checkLiquidityProvider()
@@ -238,6 +246,8 @@ export class Flyover implements Bridge {
    *
    * @throws { Error } When LBC address doesn't match expected address
    *
+   * @deprecated Use {@link Flyover.estimatePegOut}. Commit-first peg-outs have no counterparty
+   * when the user commits, so there is no quote to accept.
    **/
   async acceptAuthenticatedPegoutQuote (quote: PegoutQuote, signature: string): Promise<AcceptedPegoutQuote> {
     this.checkLiquidityProvider()
@@ -398,6 +408,14 @@ export class Flyover implements Bridge {
         discoveryContract: new DiscoveryContract(this.config.rskConnection, this.config)
       }
     }
+  }
+
+  private ensureFlyoverConfigurations (): void {
+    this.checkLbc()
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const lbc = this.liquidityBridgeContract!
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    lbc.flyoverConfigurations ??= new FlyoverConfigurationsContract(this.config.rskConnection!, this.config)
   }
 
   private ensureRskBridge (): void {
@@ -644,10 +662,41 @@ export class Flyover implements Bridge {
    * @param { RecommendedPegoutExtraArgs } extraArgs Extra arguments that can be provided to improve the estimation
    * @returns { RecommendedOperation } The estimation of which should be the quote value to result in a quote total
    * close to the **amount** parameter. Also includes the estimations for each one of the fees.
+   *
+   * @deprecated Use {@link Flyover.estimatePegOut}, which returns the exact value to send for an amount
+   * from the on-chain FlyoverConfigurations contract instead of asking a liquidity provider.
    */
   async estimateRecommendedPegout(amount: bigint, extraArgs: RecommendedPegoutExtraArgs): Promise<RecommendedOperation> {
     this.checkLiquidityProvider()
     return estimateRecommendedPegout(this.getFlyoverContext(), amount, extraArgs)
+  }
+
+  /**
+   * Commit-first peg-out estimate. Reads the peg-out configuration, fee and required BTC
+   * confirmations from the on-chain FlyoverConfigurations contract, all at the same block, and
+   * returns what `PegOutEscrow.requestPegOut` would charge and store for the given amount if
+   * mined in that block. It makes no request to a liquidity provider, so it replaces
+   * {@link Flyover.getPegoutQuotes} and {@link Flyover.acceptPegoutQuote}.
+   *
+   * Requires a connection to RSK ({@link Flyover.connectToRsk}) and the FlyoverConfigurations
+   * address for the configured network, or `customFlyoverConfigurationsAddress` in the config.
+   *
+   * @param { bigint } amount The BTC to deliver, in wei. Must be a whole number of satoshis
+   *
+   * @returns { PegoutEstimate } The value to send, its split into amount, callFee and gasFee,
+   * the required confirmations and the deadlines
+   *
+   * @throws { FlyoverError } When the amount is not positive, not a whole number of satoshis or
+   * outside the configured bounds, or when the configured deadlines exceed the native peg-out cap
+   *
+   * @example
+   *
+   * const estimate = await flyover.estimatePegOut(BigInt('5000000000000000'))
+   * // send estimate.value with the peg-out request
+   */
+  async estimatePegOut (amount: bigint): Promise<PegoutEstimate> {
+    this.ensureFlyoverConfigurations()
+    return estimatePegout(this.getFlyoverContext(), amount)
   }
 
   private getFlyoverContext (): FlyoverSDKContext {
