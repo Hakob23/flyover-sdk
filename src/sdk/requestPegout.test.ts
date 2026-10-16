@@ -2,9 +2,9 @@ import { describe, test, expect, jest, beforeEach } from '@jest/globals'
 import { requestPegout } from './requestPegout'
 import { type PegOutConfiguration } from '../blockchain/flyoverConfigurations'
 import { type FlyoverSDKContext } from '../utils/interfaces'
+import { SAT_TO_WEI } from '../constants/units'
 
 const ETHER = BigInt('1000000000000000000')
-const SAT = BigInt('10000000000')
 
 // Provisional regtest values from liquidity-bridge-contract v3.0.0 FlyoverConfigurationsRegtest.pegOutConfig
 const regtestConfig: PegOutConfiguration = {
@@ -68,7 +68,7 @@ describe('requestPegout should', () => {
   })
 
   test.each([
-    ['below minAmount', VALUE - SAT * BigInt(2), 'minAmount'],
+    ['below minAmount', VALUE - SAT_TO_WEI * BigInt(2), 'minAmount'],
     ['above maxAmount', ETHER * BigInt(11), 'maxAmount']
   ])('reject a value whose amount is %s before sending', async (_case, value, violatedBound) => {
     await expect(requestPegout(mocks.context, DESTINATION, REFUND_ADDRESS, value)).rejects.toMatchObject({
