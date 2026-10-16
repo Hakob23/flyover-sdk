@@ -1,6 +1,6 @@
 import { describe, test, beforeAll, expect } from '@jest/globals'
 import { assertTruthy, BlockchainConnection, decodeBtcAddress, ethers, type FlyoverConfig } from '@rsksmart/bridges-core-sdk'
-import { Flyover, type PegoutState, pegoutValueForAmount } from '@rsksmart/flyover-sdk'
+import { Flyover, type PegoutState, pegoutValueForAmount, SAT_TO_WEI } from '@rsksmart/flyover-sdk'
 import { integrationTestConfig } from '../config'
 import { EXTENDED_TIMEOUT } from './common/constants'
 import { fakeTokenResolver, sleepSeconds } from './common/utils'
@@ -8,7 +8,6 @@ import {
   FLYOVER_CONFIGURATIONS_ABI, gasCost, PEGOUT_ESCROW_ABI, type PegOutLimits, readPegOutLimits, revertErrorName, staticCall
 } from './common/pegoutEscrow'
 
-const SAT = BigInt('10000000000')
 const claimTimeoutSeconds = integrationTestConfig.pegoutClaimTimeoutSeconds
 const testWithClaim = claimTimeoutSeconds === undefined ? test.skip : test
 
@@ -98,7 +97,7 @@ describe('Commit-first peg-out sad paths should', () => {
   }, EXTENDED_TIMEOUT)
 
   test('reject an amount below minAmount without sending a transaction, as the escrow would', async () => {
-    const value = pegoutValueForAmount(limits.minAmount - SAT, limits)
+    const value = pegoutValueForAmount(limits.minAmount - SAT_TO_WEI, limits)
     const balanceBefore = await balanceOf(refundAddress)
 
     // AC-6, in the SDK and in the escrow itself
@@ -110,7 +109,7 @@ describe('Commit-first peg-out sad paths should', () => {
   }, EXTENDED_TIMEOUT)
 
   test('reject an amount above maxAmount without sending a transaction, as the escrow would', async () => {
-    const value = pegoutValueForAmount(limits.maxAmount + SAT, limits)
+    const value = pegoutValueForAmount(limits.maxAmount + SAT_TO_WEI, limits)
     const balanceBefore = await balanceOf(refundAddress)
 
     // AC-7, in the SDK and in the escrow itself
