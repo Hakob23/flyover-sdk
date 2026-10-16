@@ -154,7 +154,12 @@ export async function estimatePegout (context: FlyoverSDKContext, amount: bigint
   const split = splitPegoutValue(value, config, dustThreshold)
 
   if (amount < config.minAmount || amount > config.maxAmount) {
-    throw FlyoverError.pegoutNotServiceable({ amount, minAmount: config.minAmount, maxAmount: config.maxAmount })
+    throw FlyoverError.pegoutNotServiceable({
+      amount,
+      minAmount: config.minAmount,
+      maxAmount: config.maxAmount,
+      violatedBound: amount < config.minAmount ? 'minAmount' : 'maxAmount'
+    })
   }
 
   const deadlineSeconds = config.claimWindow + config.expireTime
