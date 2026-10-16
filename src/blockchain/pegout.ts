@@ -79,7 +79,7 @@ export class PegOutContract {
    */
   async getDustThreshold (blockTag: number): Promise<bigint> {
     const threshold = await executeContractView<BigNumber>(this.pegoutContract, 'dustThreshold', { blockTag })
-    return BigInt(threshold.toString())
+    return threshold.toBigInt()
   }
 
   private toContractPegoutQuote (detail: PegoutQuoteDetail): Quotes.PegOutQuoteStruct {

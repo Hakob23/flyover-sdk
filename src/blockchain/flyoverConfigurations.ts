@@ -65,21 +65,21 @@ export class FlyoverConfigurationsContract {
       this.configurationsContract, 'getPegOutConfiguration', { blockTag }
     )
     return {
-      fixedFee: toBigInt(config.fixedFee),
-      percentageFee: toBigInt(config.percentageFee),
-      minAmount: toBigInt(config.minAmount),
-      maxAmount: toBigInt(config.maxAmount),
+      fixedFee: config.fixedFee.toBigInt(),
+      percentageFee: config.percentageFee.toBigInt(),
+      minAmount: config.minAmount.toBigInt(),
+      maxAmount: config.maxAmount.toBigInt(),
       confirmationTiers: config.confirmationTiers.map(tier => ({
-        maxAmount: toBigInt(tier.maxAmount),
-        confirmations: toBigInt(tier.confirmations)
+        maxAmount: tier.maxAmount.toBigInt(),
+        confirmations: tier.confirmations.toBigInt()
       })),
-      penaltyFee: toBigInt(config.penaltyFee),
-      claimWindow: toBigInt(config.claimWindow),
-      claimWindowBlocks: toBigInt(config.claimWindowBlocks),
-      callTime: toBigInt(config.callTime),
-      expireTime: toBigInt(config.expireTime),
-      expireBlocks: toBigInt(config.expireBlocks),
-      maxMinerFee: toBigInt(config.maxMinerFee)
+      penaltyFee: config.penaltyFee.toBigInt(),
+      claimWindow: config.claimWindow.toBigInt(),
+      claimWindowBlocks: config.claimWindowBlocks.toBigInt(),
+      callTime: config.callTime.toBigInt(),
+      expireTime: config.expireTime.toBigInt(),
+      expireBlocks: config.expireBlocks.toBigInt(),
+      maxMinerFee: config.maxMinerFee.toBigInt()
     }
   }
 
@@ -93,7 +93,7 @@ export class FlyoverConfigurationsContract {
     const fee = await executeContractView<BigNumber>(
       this.configurationsContract, 'calculatePegOutFee', amount, { blockTag }
     )
-    return toBigInt(fee)
+    return fee.toBigInt()
   }
 
   /**
@@ -106,10 +106,6 @@ export class FlyoverConfigurationsContract {
     const confirmations = await executeContractView<BigNumber>(
       this.configurationsContract, 'getRequiredPegOutBtcConfirmations', amount, { blockTag }
     )
-    return toBigInt(confirmations)
+    return confirmations.toBigInt()
   }
-}
-
-function toBigInt (value: BigNumber): bigint {
-  return BigInt(value.toString())
 }
