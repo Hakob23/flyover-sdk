@@ -2,8 +2,8 @@ import { assertTruthy } from '@rsksmart/bridges-core-sdk'
 import { type PegOutConfiguration } from '../blockchain/flyoverConfigurations'
 import { FlyoverError } from '../client/httpClient'
 import { type FlyoverSDKContext } from '../utils/interfaces'
+import { SAT_TO_WEI } from '../constants/units'
 
-const SAT_TO_WEI = BigInt('10000000000')
 const FEE_PERCENTAGE_DENOMINATOR = BigInt(10_000)
 // PegOutContract caps a quote's deadlines at the native peg-out's: 36 hours and 4000 blocks
 const NATIVE_PEGOUT_SECONDS = BigInt(129_600)
