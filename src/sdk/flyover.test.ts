@@ -34,6 +34,8 @@ import { getPegoutPaymentData } from './getPegoutPaymentData'
 import { PegOutContract } from '../blockchain/pegout'
 import { PegInContract } from '../blockchain/pegin'
 import { DiscoveryContract } from '../blockchain/discovery'
+import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfigurations'
+import { estimatePegout } from './estimatePegout'
 
 jest.mock('ethers')
 
@@ -60,6 +62,7 @@ jest.mock('./isPeginRefundable')
 jest.mock('./recommendedPegin')
 jest.mock('./recommendedPegout')
 jest.mock('./signQuote')
+jest.mock('./estimatePegout')
 jest.mock('./getPeginPaymentData')
 jest.mock('./getPegoutPaymentData')
 
@@ -1204,6 +1207,42 @@ describe('Flyover object should', () => {
     })
     test('fail if LP has not been selected', async () => {
       await expect(flyover.estimateRecommendedPegout(amount, extraArgs)).rejects.toThrow('You need to select a provider to do this operation')
+    })
+  })
+
+  describe('estimatePegOut method should', () => {
+    const amount = BigInt('5000000000000000')
+    const configurationsAddress = '0x4186a8ecd32cf005a5122b63195f7117cbc4be19'
+
+    test('fail without a RSK connection', async () => {
+      await expect(flyover.estimatePegOut(amount)).rejects.toThrow('Not connected to RSK')
+    })
+
+    test('fail when the network has no FlyoverConfigurations address', async () => {
+      await flyover.connectToRsk(rskConnectionMock)
+      await expect(flyover.estimatePegOut(amount)).rejects.toThrow(/invalid FlyoverConfigurations address/)
+    })
+
+    test('invoke estimatePegout with the FlyoverConfigurations contract and no liquidity provider', async () => {
+      flyover = new Flyover({
+        network: FAKE_NETWORK,
+        captchaTokenResolver: async () => Promise.resolve(''),
+        customFlyoverConfigurationsAddress: configurationsAddress
+      })
+      await flyover.connectToRsk(rskConnectionMock)
+      await flyover.estimatePegOut(amount)
+
+      expect(estimatePegout).toBeCalledTimes(1)
+      expect(estimatePegout).toBeCalledWith(
+        expect.objectContaining({
+          provider: undefined,
+          lbc: expect.objectContaining({
+            pegOutContract: expect.any(PegOutContract),
+            flyoverConfigurations: expect.any(FlyoverConfigurationsContract)
+          })
+        }),
+        amount
+      )
     })
   })
 
