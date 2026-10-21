@@ -12,7 +12,7 @@ import { type Quote, type PeginQuoteRequest, type LiquidityProvider, type Pegout
 import { LiquidityBridgeContract } from '../blockchain/lbc'
 import { refundPegout } from './refundPegout'
 import { registerPegin, type RegisterPeginParams } from './registerPegin'
-import { type BlockchainConnection } from '@rsksmart/bridges-core-sdk'
+import { type BlockchainConnection, type FlyoverConfig } from '@rsksmart/bridges-core-sdk'
 import { FlyoverError } from '../client/httpClient'
 import { supportsConversion } from './supportsConversion'
 import { getMetadata } from './getMetadata'
@@ -34,6 +34,8 @@ import { PegInContract } from '../blockchain/pegin'
 import { DiscoveryContract } from '../blockchain/discovery'
 import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfigurations'
 import { estimatePegout } from './estimatePegout'
+import { requestPegout } from './requestPegout'
+import { PegOutEscrowContract } from '../blockchain/pegoutEscrow'
 
 jest.mock('ethers')
 
@@ -61,6 +63,7 @@ jest.mock('./recommendedPegin')
 jest.mock('./recommendedPegout')
 jest.mock('./signQuote')
 jest.mock('./estimatePegout')
+jest.mock('./requestPegout')
 
 const mockedGetQuote = getQuote as jest.Mock<typeof getQuote>
 const mockedGetPegoutQuote = getPegoutQuote as jest.Mock<typeof getPegoutQuote>
@@ -1266,6 +1269,48 @@ describe('Flyover object should', () => {
           })
         }),
         amount
+      )
+    })
+  })
+
+  describe('requestPegOut method should', () => {
+    const destination = 'mxqk28jvEtvjxRN8k7W9hFEJfWz5VcUgHW'
+    const refundAddress = '0x79568c2989232dca1840087d73d403602364c0d4'
+    const value = BigInt('5605000000000000')
+    const commitFirstConfig: FlyoverConfig = {
+      network: FAKE_NETWORK,
+      captchaTokenResolver: async () => Promise.resolve(''),
+      customFlyoverConfigurationsAddress: '0x4186a8ecd32cf005a5122b63195f7117cbc4be19',
+      customPegOutEscrowAddress: '0x8901a2bbf639bfd21a97004ba4d7ae2bd00b8da8'
+    }
+
+    test('fail without a RSK connection', async () => {
+      await expect(flyover.requestPegOut(destination, refundAddress, value)).rejects.toThrow('Not connected to RSK')
+    })
+
+    test('fail when the network has no PegOutEscrow address', async () => {
+      flyover = new Flyover({ ...commitFirstConfig, customPegOutEscrowAddress: undefined })
+      await flyover.connectToRsk(rskConnectionMock)
+      await expect(flyover.requestPegOut(destination, refundAddress, value)).rejects.toThrow(/invalid PegOutEscrow address/)
+    })
+
+    test('invoke requestPegout with the commit-first contracts and no liquidity provider', async () => {
+      flyover = new Flyover(commitFirstConfig)
+      await flyover.connectToRsk(rskConnectionMock)
+      await flyover.requestPegOut(destination, refundAddress, value)
+
+      expect(requestPegout).toBeCalledTimes(1)
+      expect(requestPegout).toBeCalledWith(
+        expect.objectContaining({
+          provider: undefined,
+          lbc: expect.objectContaining({
+            flyoverConfigurations: expect.any(FlyoverConfigurationsContract),
+            pegOutEscrow: expect.any(PegOutEscrowContract)
+          })
+        }),
+        destination,
+        refundAddress,
+        value
       )
     })
   })

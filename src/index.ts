@@ -47,4 +47,5 @@ export {
   pegoutValueForAmount
 } from './sdk/estimatePegout'
 export { type PegOutConfiguration, type ConfirmationTier } from './blockchain/flyoverConfigurations'
+export { type PegoutRequest } from './blockchain/pegoutEscrow'
 export { type BtcAddressType } from './bitcoin/address'
