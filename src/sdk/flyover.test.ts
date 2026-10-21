@@ -37,6 +37,7 @@ import { DiscoveryContract } from '../blockchain/discovery'
 import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfigurations'
 import { estimatePegout } from './estimatePegout'
 import { requestPegout } from './requestPegout'
+import { cancelPegout } from './cancelPegout'
 import { PegOutEscrowContract } from '../blockchain/pegoutEscrow'
 
 jest.mock('ethers')
@@ -66,6 +67,7 @@ jest.mock('./recommendedPegout')
 jest.mock('./signQuote')
 jest.mock('./estimatePegout')
 jest.mock('./requestPegout')
+jest.mock('./cancelPegout')
 jest.mock('./getPeginPaymentData')
 jest.mock('./getPegoutPaymentData')
 
@@ -1287,6 +1289,35 @@ describe('Flyover object should', () => {
         destination,
         refundAddress,
         value
+      )
+    })
+  })
+
+  describe('cancelPegOut method should', () => {
+    const requestHash = 'ab'.repeat(32)
+
+    test('fail without a RSK connection', async () => {
+      await expect(flyover.cancelPegOut(requestHash)).rejects.toThrow('Not connected to RSK')
+    })
+
+    test('fail when the network has no PegOutEscrow address', async () => {
+      await flyover.connectToRsk(rskConnectionMock)
+      await expect(flyover.cancelPegOut(requestHash)).rejects.toThrow(/invalid PegOutEscrow address/)
+    })
+
+    test('invoke cancelPegout with the PegOutEscrow contract', async () => {
+      flyover = new Flyover({
+        network: FAKE_NETWORK,
+        captchaTokenResolver: async () => Promise.resolve(''),
+        customPegOutEscrowAddress: '0x8901a2bbf639bfd21a97004ba4d7ae2bd00b8da8'
+      })
+      await flyover.connectToRsk(rskConnectionMock)
+      await flyover.cancelPegOut(requestHash)
+
+      expect(cancelPegout).toBeCalledTimes(1)
+      expect(cancelPegout).toBeCalledWith(
+        expect.objectContaining({ lbc: expect.objectContaining({ pegOutEscrow: expect.any(PegOutEscrowContract) }) }),
+        requestHash
       )
     })
   })

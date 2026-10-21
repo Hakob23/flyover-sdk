@@ -1,13 +1,15 @@
 import {
   BridgeError, type Connection, decodeBtcAddress, executeContractView, type FlyoverConfig, isRskAddress
 } from '@rsksmart/bridges-core-sdk'
-import { Contract, type ContractReceipt, type ContractTransaction } from 'ethers'
+import { Contract, type ContractReceipt, type ContractTransaction, type Signer } from 'ethers'
 import abi from './pegout-escrow-abi'
 import { type Quotes } from './bindings/Pegout'
 import { FlyoverNetworks, type FlyoverSupportedNetworks } from '../constants/networks'
 import { FlyoverError } from '../client/httpClient'
 
-const REQUESTED_STATE = 1
+/** States of a commit-first peg-out in the PegOutEscrow, in the contract's enum order. */
+export const PEGOUT_STATES = ['NONE', 'REQUESTED', 'CLAIMED', 'CANCELLED', 'FULFILLED', 'REFUNDED'] as const
+export type PegoutState = typeof PEGOUT_STATES[number]
 
 /** A commit-first peg-out request mined on the PegOutEscrow. */
 export interface PegoutRequest {
@@ -50,28 +52,12 @@ export class PegOutEscrowContract {
    * @throws { FlyoverError } When the transaction is mined but reverts; the error carries its hash
    */
   async requestPegOut (destinationAddress: string, refundAddress: string, value: bigint): Promise<PegoutRequest> {
-    let tx: ContractTransaction
-    try {
-      tx = await this.escrowContract.requestPegOut(decodeBtcAddress(destinationAddress), refundAddress, { value })
-    } catch (error) {
-      throw new BridgeError({
-        timestamp: Date.now(),
-        recoverable: true,
-        message: 'error executing function requestPegOut',
-        details: { error: errorMessage(error) }
-      })
-    }
-
-    let receipt: ContractReceipt
-    try {
-      receipt = await tx.wait()
-    } catch (error) {
-      throw FlyoverError.pegoutRequestReverted({ txHash: tx.hash, reason: errorMessage(error) })
-    }
-
+    const receipt = await this.send(
+      'requestPegOut', [decodeBtcAddress(destinationAddress), refundAddress, { value }], FlyoverError.pegoutRequestReverted
+    )
     const requestHash: string | undefined = receipt.events?.find(e => e.event === 'PegOutRequested')?.args?.requestHash
     if (requestHash === undefined) {
-      throw FlyoverError.withReason(`requestPegOut transaction ${tx.hash} emitted no PegOutRequested event`)
+      throw FlyoverError.withReason(`requestPegOut transaction ${receipt.transactionHash} emitted no PegOutRequested event`)
     }
     const id = requestHash.startsWith('0x') ? requestHash.slice(2) : requestHash
     let nonce: bigint | undefined
@@ -85,9 +71,76 @@ export class PegOutEscrowContract {
     return { requestHash: id, txHash: receipt.transactionHash, nonce }
   }
 
+  /**
+   * Sends PegOutEscrow.cancelPegOut and waits for it to be mined.
+   *
+   * @param requestHash the id of the peg-out, with or without the 0x prefix
+   * @returns the transaction hash
+   *
+   * @throws { BridgeError } When the transaction cannot be sent
+   * @throws { FlyoverError } When the transaction is mined but reverts; the error carries its hash
+   */
+  async cancelPegOut (requestHash: string): Promise<string> {
+    const receipt = await this.send('cancelPegOut', [with0x(requestHash)], FlyoverError.pegoutCancelReverted)
+    return receipt.transactionHash
+  }
+
+  /**
+   * Reads the escrow state of a peg-out id. An id the escrow never issued, or one it re-keyed when an LP
+   * claimed it, reads NONE.
+   */
+  async getPegOutState (requestHash: string, blockTag: number): Promise<PegoutState> {
+    const state = await executeContractView<number>(this.escrowContract, 'getPegOutState', with0x(requestHash), { blockTag })
+    return PEGOUT_STATES[state] ?? 'NONE'
+  }
+
+  /**
+   * Reads the refund address of a stored peg-out. Reverts for an id that reads NONE, and reads the zero
+   * address once the peg-out is CANCELLED, FULFILLED or REFUNDED.
+   */
+  async getRefundAddress (requestHash: string, blockTag: number): Promise<string> {
+    const quote = await executeContractView<Quotes.PegOutQuoteStructOutput>(
+      this.escrowContract, 'getPegOutQuote', with0x(requestHash), { blockTag }
+    )
+    return quote.rskRefundAddress
+  }
+
+  /** Address of the account that signs this contract's transactions. */
+  async getSenderAddress (): Promise<string> {
+    // ethers sets the signer to null when the contract is built on a read-only connection
+    const signer: Signer | null = this.escrowContract.signer
+    if (signer === null) {
+      throw FlyoverError.withReason('a signing RSK connection is required to send PegOutEscrow transactions')
+    }
+    return signer.getAddress()
+  }
+
+  private async send (
+    method: string,
+    args: unknown[],
+    onRevert: (args: { txHash: string, reason: string }) => FlyoverError
+  ): Promise<ContractReceipt> {
+    let tx: ContractTransaction
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      tx = await this.escrowContract[method]!(...args)
+    } catch (error) {
+      throw new BridgeError({
+        timestamp: Date.now(),
+        recoverable: true,
+        message: `error executing function ${method}`,
+        details: { error: errorMessage(error) }
+      })
+    }
+    try {
+      return await tx.wait()
+    } catch (error) {
+      throw onRevert({ txHash: tx.hash, reason: errorMessage(error) })
+    }
+  }
+
   private async readNonce (requestHash: string, blockTag: number): Promise<bigint | undefined> {
-    const state = await executeContractView<number>(this.escrowContract, 'getPegOutState', requestHash, { blockTag })
-    if (state !== REQUESTED_STATE) {
+    if (await this.getPegOutState(requestHash, blockTag) !== 'REQUESTED') {
       return undefined
     }
     const quote = await executeContractView<Quotes.PegOutQuoteStructOutput>(
@@ -99,4 +152,8 @@ export class PegOutEscrowContract {
 
 function errorMessage (error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function with0x (hash: string): string {
+  return hash.startsWith('0x') ? hash : '0x' + hash
 }
