@@ -1,8 +1,5 @@
-import { getQuote } from './getQuote'
 import { getProviders } from './getProviders'
-import { acceptQuote } from './acceptQuote'
 import {
-  type AcceptedQuote, type Quote, type PeginQuoteRequest,
   type LiquidityProvider, type PegoutQuoteRequest, type PegoutQuote,
   type AcceptedPegoutQuote,
   type DepositEvent,
@@ -13,7 +10,6 @@ import {
 } from '../api'
 import { getPegoutQuote } from './getPegoutQuote'
 import { acceptPegoutQuote } from './acceptPegoutQuote'
-import { getPeginPaymentData, type PeginAmountUnit, type PeginPaymentData } from './getPeginPaymentData'
 import { getPegoutPaymentData, type PegoutPaymentData } from './getPegoutPaymentData'
 import { LiquidityBridgeContract } from '../blockchain/lbc'
 import { depositPegout } from './depositPegout'
@@ -32,21 +28,13 @@ import { getPeginStatus } from './getPeginStatus'
 import { getPegoutStatus } from './getPegoutStatus'
 import { FlyoverNetworks, type FlyoverSupportedNetworks } from '../constants/networks'
 import { getAvailableLiquidity } from './getAvailableLiquidity'
-import { RskBridge } from '../blockchain/bridge'
-import { validatePeginTransaction, type ValidatePeginTransactionOptions, type ValidatePeginTransactionParams } from './validatePeginTransaction'
-import { isPeginQuotePaid } from './isPeginQuotePaid'
 import { isPegoutQuotePaid } from './isPegoutQuotePaid'
 import { type BitcoinDataSource } from '../bitcoin/BitcoinDataSource'
 import { type FlyoverSDKContext, type IsQuoteRefundableResponse, type IsQuotePaidResponse } from '../utils/interfaces'
 import { isPegoutRefundable } from './isPegoutRefundable'
-import { isPeginRefundable, type IsPeginRefundableParams } from './isPeginRefundable'
-import { type RegisterPeginParams, registerPegin } from './registerPegin'
-import { acceptAuthenticatedQuote } from './acceptAuthenticatedQuote'
 import { acceptAuthenticatedPegoutQuote } from './acceptAuthenticatedPegoutQuote'
 import { signQuote } from './signQuote'
-import { estimateRecommendedPegin, RecommendedPeginExtraArgs } from './recommendedPegin'
 import { estimateRecommendedPegout, RecommendedPegoutExtraArgs } from './recommendedPegout'
-import { PegInContract } from '../blockchain/pegin'
 import { PegOutContract } from '../blockchain/pegout'
 import { DiscoveryContract } from '../blockchain/discovery'
 import { FlyoverConfigurationsContract } from '../blockchain/flyoverConfigurations'
@@ -60,9 +48,7 @@ import { getPegoutState } from './getPegoutState'
 export class Flyover implements Bridge {
   private liquidityProvider?: LiquidityProvider
   private liquidityBridgeContract?: LiquidityBridgeContract
-  private rskBridge?: RskBridge
   private readonly httpClient: HttpClient
-  private lastPeginQuote: Quote | null
   private lastPegoutQuote: PegoutQuote | null
 
   /**
@@ -78,7 +64,6 @@ export class Flyover implements Bridge {
     config.allowInsecureConnections ??= false
     config.disableChecksum ??= false
     this.httpClient = getHttpClient(config.captchaTokenResolver)
-    this.lastPeginQuote = null
     this.lastPegoutQuote = null
   }
 
@@ -101,79 +86,6 @@ export class Flyover implements Bridge {
     this.checkLbc()
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return getProviders(this.httpClient, this.liquidityBridgeContract!)
-  }
-
-  /**
-   * Get available quotes for given parameters
-   *
-   * @param { QuoteRequest } quoteRequest Quote request to compute available quotes
-   *
-   * @returns { Quote[] } List of available quotes
-   *
-   * @throws { Error } When provider has not been set in the Flyover instance
-   *
-   * @throws { Error } When quoteRequest has missing fields
-   *
-   * @example
-   *
-   * flyover.useProvider(provider)
-   * await flyover.getQuotes(quoteRequest)
-   */
-  async getQuotes (quoteRequest: PeginQuoteRequest): Promise<Quote[]> {
-    this.checkLiquidityProvider()
-    this.checkLbc()
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const quotes = await getQuote(this.config, this.httpClient, this.liquidityBridgeContract!, this.liquidityProvider!, quoteRequest)
-    this.lastPeginQuote = quotes.at(0) ?? null
-    return quotes
-  }
-
-  /**
-   * Accept a specific pegin quote
-   *
-   * @param { Quote } quote Quote to be accepted
-   *
-   * @returns { AcceptedQuote } Accepted quote with confirmation data
-   *
-   * @throws { Error } When provider has not been set in the Flyover instance
-   *
-   * @throws { Error } When quote has missing fields
-   *
-   * @example
-   *
-   * flyover.useProvider(provider)
-   * const quotes = await flyover.getQuotes(quoteRequest)
-   * await flyover.acceptQuote(quotes[0])
-   */
-  async acceptQuote (quote: Quote): Promise<AcceptedQuote> {
-    this.checkLiquidityProvider()
-    this.checkLbc()
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return acceptQuote(this.httpClient, this.liquidityBridgeContract!, this.liquidityProvider!, quote)
-  }
-
-  /**
-   * Accept a specific pegin quote from a trusted account
-   *
-   * @param { Quote } quote Quote to be accepted
-   * @param { string } signature The hash of the quote signed by the trusted account
-   *
-   * @returns { AcceptedQuote } Accepted quote with confirmation data
-   *
-   * @throws { Error } When provider has not been set in the Flyover instance
-   *
-   * @throws { Error } When quote has missing fields
-   *
-   * @throws { Error } When signature is invalid
-   *
-   * @throws { Error } When locking cap is not enough
-   *
-   **/
-  async acceptAuthenticatedQuote (quote: Quote, signature: string): Promise<AcceptedQuote> {
-    this.checkLiquidityProvider()
-    this.checkLbc()
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return acceptAuthenticatedQuote(this.httpClient, this.liquidityBridgeContract!, this.liquidityProvider!, quote, signature)
   }
 
   /**
@@ -262,36 +174,6 @@ export class Flyover implements Bridge {
   }
 
   /**
-   * Get the payment data needed to pay for a pegin quote. The returned data contains
-   * the BTC deposit address and the amount to send, which can be encoded into a QR code
-   * by the client application.
-   *
-   * @param { Quote } quote The pegin quote to pay for
-   * @param { AcceptedQuote } acceptedQuote The accepted quote returned by {@link Flyover.acceptQuote} or {@link Flyover.acceptAuthenticatedQuote}
-   * @param { object } options Optional configuration
-   * @param { PeginAmountUnit } options.amountUnit Unit for the returned amount ('BTC', 'SAT', or 'WEI'). Defaults to 'SAT'.
-   * 'BTC' and 'SAT' amounts are rounded up to the next satoshi so the payment always covers the quote total.
-   * 'WEI' returns the exact quote total, which may not be payable as a whole number of satoshis
-   *
-   * @returns { PeginPaymentData } The address and amount to pay
-   *
-   * @throws { FlyoverError } If the signature on the accepted quote is invalid
-   * @throws { FlyoverError } If the deposit address cannot be validated
-   */
-  async getPeginPaymentData (
-    quote: Quote,
-    acceptedQuote: AcceptedQuote,
-    options?: { amountUnit?: PeginAmountUnit }
-  ): Promise<PeginPaymentData> {
-    this.checkLiquidityProvider()
-    this.checkLbc()
-    // checkLiquidityProvider() throws if liquidityProvider is undefined; checkLbc() throws if rskConnection is
-    // undefined and initializes liquidityBridgeContract otherwise — both are guaranteed non-null here
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return getPeginPaymentData(this.liquidityBridgeContract!, this.liquidityProvider!, quote, acceptedQuote, options)
-  }
-
-  /**
    * Get the payment data needed to pay for a pegout quote. The returned data contains
    * the EVM transaction fields (to, data, value) which can be encoded into a QR code
    * by the client application or used to build a transaction.
@@ -322,7 +204,6 @@ export class Flyover implements Bridge {
    */
   useLiquidityProvider (provider: LiquidityProvider): void {
     this.liquidityProvider = provider
-    this.lastPeginQuote = null
     this.lastPegoutQuote = null
   }
 
@@ -418,7 +299,6 @@ export class Flyover implements Bridge {
    */
   disconnectFromRsk (): void {
     this.liquidityBridgeContract = undefined
-    this.rskBridge = undefined
     this.config.rskConnection = undefined
     this.liquidityProvider = undefined
   }
@@ -437,7 +317,6 @@ export class Flyover implements Bridge {
       throw new Error('Not connected to RSK')
     }
     this.liquidityBridgeContract ??= {
-      pegInContract: new PegInContract(rskConnection, this.config),
       pegOutContract: new PegOutContract(rskConnection, this.config),
       discoveryContract: new DiscoveryContract(rskConnection, this.config)
     }
@@ -452,14 +331,6 @@ export class Flyover implements Bridge {
   private ensurePegOutEscrow (): void {
     const { lbc, rskConnection } = this.checkLbc()
     lbc.pegOutEscrow ??= new PegOutEscrowContract(rskConnection, this.config)
-  }
-
-  private ensureRskBridge (): void {
-    if (this.config.rskConnection === undefined) {
-      throw new Error('Not connected to RSK')
-    } else if (this.rskBridge === undefined) {
-      this.rskBridge = new RskBridge(this.config.rskConnection)
-    }
   }
 
   /**
@@ -485,7 +356,7 @@ export class Flyover implements Bridge {
     if (this.liquidityProvider == null) {
       throw FlyoverError.withReason('You need to select a provider to fetch the metadata')
     }
-    return getMetadata(this.liquidityProvider, this.lastPeginQuote, this.lastPegoutQuote)
+    return getMetadata(this.liquidityProvider, this.lastPegoutQuote)
   }
 
   supportsNetwork (chainId: number): boolean {
@@ -520,25 +391,19 @@ export class Flyover implements Bridge {
   }
 
   /**
-   * Checks if a quote has been paid by the LPS. The information is initially provided by the LPS and then
-   * verified in the blockchain depending on the type of operation (RSK for pegin or Bitcoin for pegout).
+   * Checks if a pegout quote has been paid by the LPS. The information is initially provided by the LPS and then
+   * verified in the Bitcoin network.
    * This function requires that the LPS associated with this quote has been previously selected using the {@link Flyover.useLiquidityProvider} method.
    *
    * @param { string } quoteHash the has of the quote
-   * @param { 'pegin' | 'pegout' } typeOfOperation the type of operation (pegin or pegout)
+   * @param { 'pegout' } typeOfOperation the type of operation
    *
    * @returns { IsQuotePaidResponse }
    */
-  async isQuotePaid (quoteHash: string, typeOfOperation: 'pegin' | 'pegout'): Promise<IsQuotePaidResponse> {
+  async isQuotePaid (quoteHash: string, typeOfOperation: 'pegout'): Promise<IsQuotePaidResponse> {
     this.checkLiquidityProvider()
 
-    if (typeOfOperation === 'pegin') {
-      if (!await this.isConnected()) {
-        throw new Error('Before calling isQuotePaid for pegin quotes, you need to connect to RSK using Flyover.connectToRsk')
-      }
-
-      return isPeginQuotePaid(quoteHash, this.getFlyoverContext())
-    } else if (typeOfOperation === 'pegout') {
+    if (typeOfOperation === 'pegout') {
       if (!this.isConnectedToBitcoin()) {
         throw new Error('Before calling isQuotePaid for pegout quotes, you need to connect to Bitcoin using Flyover.connectToBitcoin')
       }
@@ -546,35 +411,6 @@ export class Flyover implements Bridge {
     } else {
       throw new Error('Invalid type of operation')
     }
-  }
-
-  /**
-   * Determines whether a pegin quote can be refunded. Before calling this function, you must:
-   * - Select a Liquidity Provider Service (LPS) for this quote via {@link Flyover.useLiquidityProvider} (or provide it in initial configuration)
-   * - Connect to the Bitcoin network using {@link Flyover.connectToBitcoin} (or provide it in initial configuration)
-   * - Connect to the RSK network using {@link Flyover.connectToRsk} (or provide it in initial configuration)
-   *
-   * @param { IsPeginRefundableParams } params The parameters required for the refundability check. See {@link IsPeginRefundableParams}
-   *
-   * @returns { IsQuoteRefundableResponse }
-   */
-  async isPeginRefundable (
-    params: IsPeginRefundableParams
-  ): Promise<IsQuoteRefundableResponse> {
-    this.checkLiquidityProvider()
-    this.checkLbc() // Connection to RSK is also checked here
-    if (!this.isConnectedToBitcoin()) {
-      throw new Error('Before calling isPeginQuoteRefundable you need to connect to Bitcoin using Flyover.connectToBitcoin')
-    }
-
-    const { quote, providerSignature, btcTransactionHash } = params
-
-    // Check if the quote is refundable
-    return isPeginRefundable({
-      quote,
-      providerSignature,
-      btcTransactionHash
-    }, this.getFlyoverContext())
   }
 
   /**
@@ -589,30 +425,6 @@ export class Flyover implements Bridge {
     this.checkLiquidityProvider()
     this.checkLbc()
     return isPegoutRefundable(quote, this.getFlyoverContext())
-  }
-
-  /**
-   * Registers a peg-in transaction with the bridge and pays to the involved parties. Before calling this function, you must:
-   * - Select a Liquidity Provider Service (LPS) for this quote via {@link Flyover.useLiquidityProvider} (or provide it in initial configuration)
-   * - Connect to the Bitcoin network using {@link Flyover.connectToBitcoin} (or provide it in initial configuration)
-   * - Connect to the RSK network using {@link Flyover.connectToRsk} (or provide it in initial configuration)
-   *
-   * @param { RegisterPeginParams } params The parameters required for the pegin registration. See {@link RegisterPeginParams}
-   *
-   * @returns { string } the transaction hash
-   */
-  async registerPegin (params: RegisterPeginParams): Promise<string> {
-    this.checkLiquidityProvider()
-    this.checkLbc()
-
-    if (!this.isConnectedToBitcoin()) {
-      throw new Error('Before calling isPeginQuoteRefundable you need to connect to Bitcoin using Flyover.connectToBitcoin')
-    }
-
-    return registerPegin(
-      params,
-      this.getFlyoverContext()
-    )
   }
 
   /**
@@ -650,44 +462,6 @@ export class Flyover implements Bridge {
     this.checkLiquidityProvider()
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return getAvailableLiquidity(this.httpClient, this.liquidityProvider!)
-  }
-
-  /**
-   * Checks if a Bitcoin transaction is valid for a specific PegIn. This check involves the following conditions:
-   * - The transaction is a well formed Bitcoin transaction
-   * - The transaction sends the expected amount of satoshis to the correct address according to the quote
-   * - The address in the transaction is the specific address derived for that quote
-   * - All the UTXOs sent to the derivation address are above the RSK Bridge minimum
-   * - (Optional) The validation is being done before the quote expiration
-   *
-   * This function can be used either before or after of funding and signing the transaction.
-   *
-   * @param { ValidatePeginTransactionParams } params The parameters required for the validation
-   * @param { ValidatePeginTransactionOptions } options The options for the validation
-   *
-   * @throws { FlyoverError } If {@link options.throwError} is true and the validation fails
-   *
-   * @returns { string } The error message if the validation fails and {@link options.throwError} is false
-   */
-  async validatePeginTransaction (params: ValidatePeginTransactionParams, options?: ValidatePeginTransactionOptions): Promise<string> {
-    this.checkLbc()
-    this.checkLiquidityProvider()
-    this.ensureRskBridge()
-    return validatePeginTransaction(this.getFlyoverContext(), params, options)
-  }
-
-  /**
-   * Get the recommended PegIn quote value to use in the quote request so the total value to be paid for that
-   * quote results in the closest possible value to the **amount** parameter.
-   *
-   * @param { bigint } amount The amount to approximate the quote total
-   * @param { RecommendedPeginExtraArgs } extraArgs Extra arguments that can be provided to improve the estimation
-   * @returns { RecommendedOperation } The estimation of which should be the quote value to result in a quote total
-   * close to the **amount** parameter. Also includes the estimations for each one of the fees.
-   */
-  async estimateRecommendedPegin(amount: bigint, extraArgs: RecommendedPeginExtraArgs): Promise<RecommendedOperation> {
-    this.checkLiquidityProvider()
-    return estimateRecommendedPegin(this.getFlyoverContext(), amount, extraArgs)
   }
 
   /**
@@ -802,19 +576,12 @@ export class Flyover implements Bridge {
   private getFlyoverContext (): FlyoverSDKContext {
     return {
       config: this.config,
-      bridge: this.rskBridge,
       lbc: this.liquidityBridgeContract,
       provider: this.liquidityProvider,
       httpClient: this.httpClient,
       rskConnection: this.config.rskConnection,
       btcConnection: this.bitcoinDataSource
     }
-  }
-
-  async hashPeginQuote (quote: Quote): Promise<string> {
-    this.checkLbc()
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return this.liquidityBridgeContract!.pegInContract.hashPeginQuote(quote)
   }
 
   async hashPegoutQuote (quote: PegoutQuote): Promise<string> {
@@ -827,13 +594,13 @@ export class Flyover implements Bridge {
    * Signs a quote hash with the connected signer. This is useful for the authenticated quote
    * feature, where the quote hash needs to be signed in order to accept a quote.
    *
-   * @param { Quote|PegoutQuote } quote The quote to sign
+   * @param { PegoutQuote } quote The quote to sign
    *
    * @throws { Error } If not connected to RSK
    *
    * @returns { string } The signature of the quote hash
    */
-  async signQuote (quote: Quote|PegoutQuote): Promise<string> {
+  async signQuote (quote: PegoutQuote): Promise<string> {
     this.checkLbc()
     this.checkLiquidityProvider()
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
