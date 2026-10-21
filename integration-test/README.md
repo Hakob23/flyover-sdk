@@ -13,6 +13,11 @@ To run the integration test suite, the following environment variables are requi
 - **TEST_PEGOUT_AMOUNT**: amount of the test pegouts.
 - **TEST_MEMPOOL_SPACE_URL**: MempoolSpace API url. This is used to fetch some UTXO information during the tests.
 
+The commit-first peg-out suites also need the `v3.0.0` contracts deployed on that node (`DeployFlyover` from liquidity-bridge-contract deploys and wires all of them):
+- **TEST_FLYOVER_CONFIGURATIONS_ADDRESS**: address of the `FlyoverConfigurations` contract.
+- **TEST_PEGOUT_ESCROW_ADDRESS**: address of the `PegOutEscrow` contract.
+- **TEST_PEGOUT_CLAIM_TIMEOUT_SECONDS** (optional): how long to wait for a liquidity provider to claim a peg-out. The cases that need a claim are skipped when it is unset.
+
 ## Running in CI
 
 The workflow `.github/workflows/integration.yml` runs automatically on every pull request.

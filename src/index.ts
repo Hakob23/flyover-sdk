@@ -49,5 +49,6 @@ export {
   pegoutValueForAmount
 } from './sdk/estimatePegout'
 export { type PegOutConfiguration, type ConfirmationTier } from './blockchain/flyoverConfigurations'
+export { SAT_TO_WEI } from './constants/units'
 export { type PegoutRequest, type PegoutState } from './blockchain/pegoutEscrow'
 export { type BtcAddressType } from './bitcoin/address'
