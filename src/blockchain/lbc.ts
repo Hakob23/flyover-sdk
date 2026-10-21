@@ -8,13 +8,13 @@ import { BigNumberish, Contract } from "ethers"
 import { FlyoverError } from "../client/httpClient";
 
 export interface LiquidityBridgeContract {
-    pegInContract:PegInContract
-    pegOutContract:PegOutContract
-    discoveryContract:DiscoveryContract
+    pegInContract: PegInContract
+    pegOutContract: PegOutContract
+    discoveryContract: DiscoveryContract
     // Commit-first contracts. Optional because they are not deployed on every network yet;
     // instantiated lazily only when the commit-first methods are used.
-    flyoverConfigurations?:FlyoverConfigurationsContract
-    pegOutEscrow?:PegOutEscrowContract
+    flyoverConfigurations?: FlyoverConfigurationsContract
+    pegOutEscrow?: PegOutEscrowContract
 }
 
 export async function validateNotPaused(contract: Contract): Promise<void> {
