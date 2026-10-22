@@ -35,6 +35,7 @@ import { isPegoutRefundable } from './isPegoutRefundable'
 import { acceptAuthenticatedPegoutQuote } from './acceptAuthenticatedPegoutQuote'
 import { signQuote } from './signQuote'
 import { estimateRecommendedPegout, RecommendedPegoutExtraArgs } from './recommendedPegout'
+import { PegInContract } from '../blockchain/pegin'
 import { PegOutContract } from '../blockchain/pegout'
 import { DiscoveryContract } from '../blockchain/discovery'
 
@@ -299,6 +300,7 @@ export class Flyover implements Bridge {
       throw new Error('Not connected to RSK')
     } else if (this.liquidityBridgeContract === undefined) {
       this.liquidityBridgeContract = {
+        pegInContract:  new PegInContract(this.config.rskConnection, this.config),
         pegOutContract:  new PegOutContract(this.config.rskConnection, this.config),
         discoveryContract: new DiscoveryContract(this.config.rskConnection, this.config)
       }
